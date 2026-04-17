@@ -48,3 +48,5 @@ Aplikasi ini sudah mendukung PWA. Untuk menjadikannya aplikasi Android (.apk):
 - `/src/components`: Komponen UI reusable.
 - `/src/lib`: Konfigurasi Supabase dan Utils.
 - `/public`: Aset gambar dan manifest PWA.
+
+<!-- Trigger Update: 04/18/2026 01:47:04 -->
