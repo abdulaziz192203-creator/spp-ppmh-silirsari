@@ -14,6 +14,7 @@ import {
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { formatCurrency, formatDate, cn } from "@/lib/utils"
+import { verifyPayment } from "@/app/actions/payment-actions"
 
 export const dynamic = 'force-dynamic'
 
@@ -36,21 +37,17 @@ export default function VerificationPage() {
     setPayments(data || [])
     setLoading(false)
   }
+  const handleVerify = async (id: string, status: 'paid' | 'rejected') => {
+    setLoading(true)
+    const res = await verifyPayment(id, status)
 
-  const handleVerify = async (id: string, status: 'paid' | 'unpaid') => {
-    const { error } = await supabase
-      .from("payments")
-      .update({ 
-        status, 
-        verified_at: status === 'paid' ? new Date().toISOString() : null 
-      })
-      .eq("id", id)
-
-    if (error) alert(error.message)
-    else {
+    if (!res.success) {
+      alert(res.error)
+    } else {
       setSelectedPayment(null)
       fetchPendingPayments()
     }
+    setLoading(false)
   }
 
   return (
@@ -67,7 +64,8 @@ export default function VerificationPage() {
         </div>
       </div>
 
-      <div className="glass-card rounded-3xl overflow-hidden border border-slate-800/50">
+      {/* Table - Desktop Only */}
+      <div className="hidden md:block glass-card rounded-3xl overflow-hidden border border-slate-800/50">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -116,6 +114,51 @@ export default function VerificationPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Card List - Mobile Only */}
+      <div className="md:hidden space-y-4">
+        {payments.length === 0 ? (
+          <div className="text-center py-12 text-slate-500 glass-card rounded-3xl">
+            {loading ? "Memuat..." : "Tidak ada pembayaran menunggu verifikasi."}
+          </div>
+        ) : (
+          payments.map((payment) => (
+            <motion.div 
+              key={payment.id}
+              className="glass-card rounded-2xl p-5 border border-slate-800/50 space-y-4"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="font-bold text-slate-200">{payment.students?.name}</h4>
+                  <p className="text-[10px] text-slate-500 font-medium">NISN: {payment.students?.nisn} • {payment.students?.class_room}</p>
+                </div>
+                <div className="text-blue-400 font-bold text-sm">
+                  {formatCurrency(payment.amount)}
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between text-[10px]">
+                <div className="flex items-center gap-1.5 text-slate-400">
+                  <Clock size={12} />
+                  <span>{new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, payment.month - 1))} {payment.year}</span>
+                </div>
+                <div className="text-slate-500 italic">
+                  {formatDate(payment.created_at)}
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800/50">
+                 <button 
+                    onClick={() => setSelectedPayment(payment)}
+                    className="w-full bg-blue-600/10 text-blue-400 py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                  >
+                    <ShieldCheck size={18} /> Verifikasi Bukti
+                  </button>
+              </div>
+            </motion.div>
+          ))
+        )}
       </div>
 
       {/* Verification Modal */}
@@ -197,7 +240,7 @@ export default function VerificationPage() {
                       <CheckCircle size={20} /> Konfirmasi Lunas
                     </button>
                     <button 
-                      onClick={() => handleVerify(selectedPayment.id, 'unpaid')}
+                      onClick={() => handleVerify(selectedPayment.id, 'rejected')}
                       className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-bold py-4 rounded-2xl border border-red-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
                     >
                       <XCircle size={20} /> Tolak Pembayaran

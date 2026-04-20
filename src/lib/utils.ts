@@ -20,3 +20,29 @@ export function formatDate(date: string | Date) {
     year: "numeric",
   })
 }
+
+export function getMonthName(monthIndex: number) {
+  const months = [
+    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+  ]
+  return months[monthIndex - 1] || ""
+}
+
+export function isPaymentOverdue(month: number, year: number, deadlineDay: number = 10) {
+  const today = new Date()
+  const currentMonth = today.getMonth() + 1 // 1-indexed
+  const currentYear = today.getFullYear()
+  const currentDay = today.getDate()
+
+  // Case 1: Past year
+  if (currentYear > year) return true
+  
+  // Case 2: Same year, past month
+  if (currentYear === year && currentMonth > month) return true
+
+  // Case 3: Same year, same month, past deadline day
+  if (currentYear === year && currentMonth === month && currentDay > deadlineDay) return true
+
+  return false
+}

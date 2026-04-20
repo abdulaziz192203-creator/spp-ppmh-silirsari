@@ -10,7 +10,8 @@ import {
   Trash2, 
   Edit2,
   X,
-  Check
+  Check,
+  MessageCircle
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -34,6 +35,7 @@ export default function StudentsPage() {
     parent_name: "",
     parent_phone: ""
   })
+  const [schoolName, setSchoolName] = useState("Pondok Pesantren Miftahul Huda")
 
   useEffect(() => {
     fetchStudents()
@@ -45,6 +47,10 @@ export default function StudentsPage() {
       .select("*")
       .order("name")
     setStudents(data || [])
+    
+    const { data: settings } = await supabase.from("system_settings").select("value").eq("key", "school_name").single()
+    if (settings) setSchoolName(settings.value)
+    
     setLoading(false)
   }
 
@@ -132,7 +138,8 @@ export default function StudentsPage() {
         />
       </div>
 
-      <div className="glass-card rounded-3xl overflow-hidden border border-slate-800/50">
+      {/* Table - Desktop Only */}
+      <div className="hidden md:block glass-card rounded-3xl overflow-hidden border border-slate-800/50">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -149,7 +156,7 @@ export default function StudentsPage() {
             <tbody className="divide-y divide-slate-800/50">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
                     Tidak ada data santri ditemukan.
                   </td>
                 </tr>
@@ -168,6 +175,19 @@ export default function StudentsPage() {
                     <td className="px-6 py-4 text-slate-400 text-sm truncate max-w-[150px]">{student.address}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => {
+                            const phone = student.parent_phone?.replace(/[^0-9]/g, '')
+                            if (!phone) return alert("Nomor WA tidak tersedia")
+                            const formattedPhone = phone.startsWith('0') ? '62' + phone.substring(1) : phone
+                            const message = encodeURIComponent(`Halo Bapak/Ibu ${student.parent_name || 'Wali Santri'}, ini adalah pengingat dari ${schoolName} untuk pembayaran SPP ananda ${student.name} yang masih tertunda. Mohon segera melakukan pelunasan melalui aplikasi. Terima kasih.`)
+                            window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank')
+                          }}
+                          className="p-2 hover:bg-emerald-500/10 rounded-lg text-slate-400 hover:text-emerald-400 transition-all"
+                          title="Kirim Pengingat WhatsApp"
+                        >
+                          <MessageCircle size={16} />
+                        </button>
                         <button 
                           onClick={() => {
                             setSelectedStudent(student)
@@ -191,6 +211,73 @@ export default function StudentsPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Card List - Mobile Only */}
+      <div className="md:hidden space-y-4">
+        {filteredStudents.length === 0 ? (
+          <div className="text-center py-12 text-slate-500 glass-card rounded-3xl">
+            Tidak ada data santri ditemukan.
+          </div>
+        ) : (
+          filteredStudents.map((student) => (
+            <motion.div 
+              key={student.id}
+              className="glass-card rounded-2xl p-5 border border-slate-800/50 space-y-4"
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <h4 className="font-bold text-slate-200">{student.name}</h4>
+                  <p className="text-xs text-slate-500 font-medium">NISN: {student.nisn}</p>
+                </div>
+                <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded-lg text-[10px] font-bold uppercase">
+                  {student.class_room}
+                </span>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-xs">
+                <div>
+                  <p className="text-slate-500 mb-1">Orang Tua</p>
+                  <p className="text-slate-300 font-medium">{student.parent_name || "-"}</p>
+                </div>
+                <div>
+                  <p className="text-slate-500 mb-1">No. WA</p>
+                  <p className="text-slate-300 font-medium">{student.parent_phone || "-"}</p>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-slate-800/50 flex justify-end gap-3">
+                 <button 
+                    onClick={() => {
+                      const phone = student.parent_phone?.replace(/[^0-9]/g, '')
+                      if (!phone) return alert("Nomor WA tidak tersedia")
+                      const formattedPhone = phone.startsWith('0') ? '62' + phone.substring(1) : phone
+                      const message = encodeURIComponent(`Halo Bapak/Ibu ${student.parent_name || 'Wali Santri'}, ini adalah pengingat dari ${schoolName} untuk pembayaran SPP ananda ${student.name} yang masih tertunda. Mohon segera melakukan pelunasan melalui aplikasi. Terima kasih.`)
+                      window.open(`https://wa.me/${formattedPhone}?text=${message}`, '_blank')
+                    }}
+                    className="p-2.5 bg-emerald-500/10 rounded-xl text-emerald-400"
+                  >
+                    <MessageCircle size={18} />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      setSelectedStudent(student)
+                      setIsEditModalOpen(true)
+                    }}
+                    className="p-2.5 bg-slate-800 rounded-xl text-slate-200"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteStudent(student.id, student.parent_id, student.name)}
+                    className="p-2.5 bg-red-500/10 rounded-xl text-red-400"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+              </div>
+            </motion.div>
+          ))
+        )}
       </div>
 
       {/* Add Student Modal */}

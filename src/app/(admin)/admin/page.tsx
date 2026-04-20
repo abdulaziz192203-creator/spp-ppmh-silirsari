@@ -11,7 +11,7 @@ import {
   XCircle
 } from "lucide-react"
 import { motion } from "framer-motion"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, isPaymentOverdue, cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
@@ -23,6 +23,7 @@ export default function AdminDashboard() {
     totalRevenue: 0,
     unpaidBills: 0,
     paidBills: 0,
+    overdueBills: 0,
   })
   const router = useRouter()
 
@@ -36,8 +37,16 @@ export default function AdminDashboard() {
     const { count: unpaidCount } = await supabase.from("payments").select("*", { count: 'exact', head: true }).eq("status", "unpaid")
     const { count: paidCount } = await supabase.from("payments").select("*", { count: 'exact', head: true }).eq("status", "paid")
     
-    const { data: revenueData } = await supabase.from("payments").select("amount").eq("status", "paid")
-    const totalRev = revenueData?.reduce((acc, curr) => acc + Number(curr.amount), 0) || 0
+    // Calculate Overdue
+    const { data: settings } = await supabase.from("system_settings").select("value").eq("key", "payment_deadline_day").single()
+    const deadline = settings ? parseInt(settings.value) : 10
+    
+    const { data: unpaidData } = await supabase.from("payments").select("month, year").eq("status", "unpaid")
+    const overdueCount = unpaidData?.filter(p => isPaymentOverdue(p.month, p.year, deadline)).length || 0
+
+    // Calculate Total Revenue
+    const { data: paidData } = await supabase.from("payments").select("amount").eq("status", "paid")
+    const totalRev = paidData?.reduce((acc, curr) => acc + Number(curr.amount), 0) || 0
 
     setStats({
       totalStudents: studentCount || 0,
@@ -45,6 +54,7 @@ export default function AdminDashboard() {
       totalRevenue: totalRev,
       unpaidBills: unpaidCount || 0,
       paidBills: paidCount || 0,
+      overdueBills: overdueCount
     })
   }
 
@@ -52,7 +62,8 @@ export default function AdminDashboard() {
     { name: "Total Santri", value: stats.totalStudents, icon: Users, color: "blue" },
     { name: "Sudah Lunas", value: stats.paidBills, icon: CheckCircle2, color: "green" },
     { name: "Menunggu Verifikasi", value: stats.pendingPayments, icon: Clock, color: "amber" },
-    { name: "Belum Bayar", value: stats.unpaidBills, icon: XCircle, color: "red" },
+    { name: "Belum Bayar", value: stats.unpaidBills, icon: XCircle, color: "slate" },
+    { name: "Tunggakan Terlambat", value: stats.overdueBills, icon: XCircle, color: "red" },
   ]
 
   return (
@@ -120,6 +131,3 @@ export default function AdminDashboard() {
   )
 }
 
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(" ")
-}

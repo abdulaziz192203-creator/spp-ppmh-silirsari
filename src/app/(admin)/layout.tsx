@@ -12,10 +12,13 @@ import {
   LogOut, 
   ChevronRight,
   Menu,
-  X
+  X,
+  Heart,
+  Newspaper
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
+import PushNotificationManager from "@/components/PushNotificationManager"
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
@@ -30,6 +33,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     { name: "Pembayaran", icon: CreditCard, path: "/admin/payments" },
     { name: "Tagihan", icon: CheckSquare, path: "/admin/bills" },
     { name: "Verifikasi", icon: CheckSquare, path: "/admin/verify" },
+    { name: "Donasi", icon: Heart, path: "/admin/donations" },
+    { name: "Pengumuman", icon: Newspaper, path: "/admin/announcements" },
     { name: "Pengaturan", icon: Settings, path: "/admin/settings" },
   ]
 
@@ -112,22 +117,68 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </aside>
 
-      {/* Mobile Menu Toggle */}
-      <div className="md:hidden fixed top-4 left-4 z-50">
-        <button 
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-3 bg-slate-900 border border-slate-800 rounded-2xl text-slate-100"
-        >
-          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-        </button>
+      {/* Mobile Top Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-slate-950/80 backdrop-blur-md border-b border-slate-800 z-[60] px-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img src="/logo-ppmh.png" alt="Logo PPMH" className="h-8 w-8 object-contain" />
+          <h1 className="text-lg font-bold font-outfit gradient-text">ADMIN PANEL</h1>
+        </div>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto min-w-0">
-        <div className="p-4 md:p-8 max-w-7xl mx-auto pt-20 md:pt-8">
+      <main className="flex-1 overflow-y-auto min-w-0 pb-24 md:pb-0 pt-16 md:pt-0">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto">
           {children}
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-slate-900 border-t border-slate-800 z-[100] px-2 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.4)]">
+        <button 
+          onClick={() => router.push('/admin')}
+          className={cn("flex flex-col items-center gap-1.5 min-w-[64px]", pathname === '/admin' ? "text-blue-400" : "text-slate-500")}
+        >
+          <BarChart size={20} />
+          <span className="text-[10px] font-bold">Beranda</span>
+        </button>
+
+        <button 
+          onClick={() => router.push('/admin/verify')}
+          className={cn("flex flex-col items-center gap-1.5 min-w-[64px] relative", pathname === '/admin/verify' ? "text-blue-400" : "text-slate-500")}
+        >
+          <CheckSquare size={20} />
+          <span className="text-[10px] font-bold">Verifikasi</span>
+          {pendingCount > 0 && (
+            <span className="absolute top-0 right-3 bg-red-500 text-white text-[8px] font-black rounded-full h-4 w-4 flex items-center justify-center shadow-lg shadow-red-900/40 translate-x-1/2">
+              {pendingCount}
+            </span>
+          )}
+        </button>
+
+        <button 
+          onClick={() => router.push('/admin/students')}
+          className={cn("flex flex-col items-center gap-1.5 min-w-[64px]", pathname === '/admin/students' ? "text-blue-400" : "text-slate-500")}
+        >
+          <Users size={20} />
+          <span className="text-[10px] font-bold">Santri</span>
+        </button>
+
+        <button 
+          onClick={() => router.push('/admin/donations')}
+          className={cn("flex flex-col items-center gap-1.5 min-w-[64px]", pathname === '/admin/donations' ? "text-blue-400" : "text-slate-500")}
+        >
+          <Heart size={20} />
+          <span className="text-[10px] font-bold">Donasi</span>
+        </button>
+
+        <button 
+          onClick={() => setMobileMenuOpen(true)}
+          className={cn("flex flex-col items-center gap-1.5 min-w-[64px]", mobileMenuOpen ? "text-blue-400" : "text-slate-500")}
+        >
+          <Menu size={20} />
+          <span className="text-[10px] font-bold">Menu</span>
+        </button>
+      </nav>
 
       {/* Sidebar - Mobile Overlay */}
       <AnimatePresence>
@@ -144,13 +195,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               initial={{ x: -300 }}
               animate={{ x: 0 }}
               exit={{ x: -300 }}
-              className="fixed top-0 left-0 bottom-0 w-64 bg-slate-900 z-50 md:hidden p-6"
+              className="fixed top-0 left-0 bottom-0 w-64 bg-slate-900 z-50 md:hidden p-6 flex flex-col"
             >
-              <div className="flex items-center gap-3 mb-8">
-                <img src="/logo-ppmh.png" alt="Logo PPMH" className="h-8 w-8 object-contain" />
-                <h1 className="text-xl font-bold font-outfit gradient-text">PPMH ADMIN</h1>
+              <div className="flex items-center justify-between mb-8 shrink-0">
+                <div className="flex items-center gap-3">
+                  <img src="/logo-ppmh.png" alt="Logo PPMH" className="h-8 w-8 object-contain" />
+                  <h1 className="text-xl font-bold font-outfit gradient-text">PPMH ADMIN</h1>
+                </div>
+                <button onClick={() => setMobileMenuOpen(false)} className="text-slate-500">
+                  <X size={20} />
+                </button>
               </div>
-              <nav className="space-y-2">
+              <nav className="space-y-2 flex-1 overflow-y-auto pr-2 mb-20">
                 {menuItems.map((item) => (
                   <button
                     key={item.path}
@@ -188,6 +244,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </>
         )}
       </AnimatePresence>
+      <PushNotificationManager />
     </div>
   )
 }

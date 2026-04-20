@@ -223,7 +223,8 @@ export default function PaymentsPage() {
       </div>
 
       {/* Payments Table */}
-      <div className="glass-card rounded-3xl overflow-hidden border border-slate-800/50">
+      {/* Table - Desktop Only */}
+      <div className="hidden md:block glass-card rounded-3xl overflow-hidden border border-slate-800/50">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead>
@@ -309,6 +310,70 @@ export default function PaymentsPage() {
         <div className="px-6 py-4 bg-slate-900/30 border-t border-slate-800/50 flex justify-between text-xs text-slate-500">
           <span>Menampilkan {filteredPayments.length} dari {allPayments.length} pembayaran</span>
         </div>
+      </div>
+
+      {/* Card List - Mobile Only */}
+      <div className="md:hidden space-y-4 pb-20">
+        {loading ? (
+          <div className="flex justify-center py-10">
+            <Clock className="animate-spin text-blue-500" size={32} />
+          </div>
+        ) : filteredPayments.length === 0 ? (
+          <div className="text-center py-12 text-slate-500 glass-card rounded-3xl">
+            Tidak ada data pembayaran ditemukan.
+          </div>
+        ) : (
+          filteredPayments.map((payment, idx) => (
+            <motion.div 
+              key={payment.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              className="glass-card rounded-2xl p-5 border border-slate-800/50 space-y-4"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
+                    payment.status === 'paid' ? "bg-green-500/10 text-green-500" :
+                    payment.status === 'pending' ? "bg-amber-500/10 text-amber-400" :
+                    "bg-red-500/10 text-red-500"
+                  )}>
+                    {payment.status === 'paid' ? <CheckCircle2 size={20} /> :
+                     payment.status === 'pending' ? <Clock size={20} /> :
+                     <AlertCircle size={20} />}
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-200 text-sm">{payment.students?.name}</h4>
+                    <p className="text-[10px] text-slate-500">{getMonthName(payment.month)} {payment.year}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleDeleteOne(payment.id, payment.students?.name)}
+                  className="p-2 text-slate-500 hover:text-red-400"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div className="text-blue-400 font-bold text-sm">
+                  {formatCurrency(payment.amount)}
+                </div>
+                <span className={cn(
+                  "text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border",
+                  payment.status === 'paid' ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                  payment.status === 'pending' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                  "bg-red-500/10 text-red-400 border-red-500/20"
+                )}>
+                  {payment.status === 'paid' ? 'LUNAS' : 
+                   payment.status === 'pending' ? 'VERIFIKASI' : 
+                   'BELUM BAYAR'}
+                </span>
+              </div>
+            </motion.div>
+          ))
+        )}
       </div>
     </div>
   )

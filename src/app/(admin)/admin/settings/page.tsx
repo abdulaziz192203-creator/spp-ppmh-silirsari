@@ -28,11 +28,8 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState({
     school_name: "",
     school_address: "",
-    bank_name: "",
-    bank_account_number: "",
-    bank_account_name: "",
     academic_year: "",
-    payment_deadline_day: ""
+    emergency_whatsapp: ""
   })
 
   const [adminProfile, setAdminProfile] = useState({
@@ -62,15 +59,13 @@ export default function SettingsPage() {
       setSettings({
         school_name: settingsObj.school_name || "Pondok Pesantren Miftahul Huda",
         school_address: settingsObj.school_address || "",
-        bank_name: settingsObj.bank_name || "BSI (Mandiri Syariah)",
-        bank_account_number: settingsObj.bank_account_number || "7123456789",
-        bank_account_name: settingsObj.bank_account_name || "PP Miftahul Huda",
         academic_year: settingsObj.academic_year || "2025/2026",
-        payment_deadline_day: settingsObj.payment_deadline_day || "10"
+        emergency_whatsapp: settingsObj.emergency_whatsapp || ""
       })
 
       // 2. Fetch Admin Profile
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (user) {
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
@@ -106,12 +101,13 @@ export default function SettingsPage() {
 
       const { error } = await supabase
         .from("system_settings")
-        .upsert(updates)
+        .upsert(updates, { onConflict: 'key' })
       
       if (error) throw error
 
       // Also update admin profile
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (user) {
         const { error: profileError } = await supabase
           .from("profiles")
@@ -123,8 +119,8 @@ export default function SettingsPage() {
 
       setMessage({ type: 'success', text: "Pengaturan berhasil disimpan!" })
     } catch (error: any) {
-      console.error("Error saving settings:", error.message)
-      setMessage({ type: 'error', text: "Gagal menyimpan pengaturan: " + error.message })
+      console.error("Error saving settings details:", error)
+      setMessage({ type: 'error', text: "Gagal menyimpan pengaturan: " + (error.message || "Terjadi kesalahan tidak dikenal") })
     } finally {
       setSaving(false)
     }
@@ -150,7 +146,7 @@ export default function SettingsPage() {
         <p className="text-slate-400">Kelola identitas instansi, periode akademik, dan parameter pembayaran.</p>
       </div>
 
-      <form onSubmit={handleSaveSettings} className="space-y-6">
+      <form id="settings-form" onSubmit={handleSaveSettings} className="space-y-6">
         {message && (
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
@@ -215,25 +211,42 @@ export default function SettingsPage() {
                   placeholder="Contoh: 2023/2024"
                 />
               </div>
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-slate-400">Batas Tanggal Pembayaran (Setiap Bulan)</label>
-                <div className="flex items-center gap-3">
-                  <input 
-                    type="number"
-                    min="1"
-                    max="31"
-                    value={settings.payment_deadline_day}
-                    onChange={(e) => setSettings({...settings, payment_deadline_day: e.target.value})}
-                    className="w-24 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-all text-center"
-                    placeholder="10"
-                  />
-                  <span className="text-slate-500 text-sm">Setiap tanggal {settings.payment_deadline_day || '...'}</span>
-                </div>
-              </div>
             </div>
           </div>
 
+          {/* Section: Kontak Darurat */}
+          <div className="glass-card rounded-3xl p-6 border border-slate-800/50 space-y-6">
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
+              <AlertCircle className="text-red-400" size={20} />
+              <h3 className="font-bold text-lg">Layanan Darurat</h3>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-slate-400">Nomor WhatsApp Darurat</label>
+                <input 
+                  type="text"
+                  value={settings.emergency_whatsapp}
+                  onChange={(e) => setSettings({...settings, emergency_whatsapp: e.target.value})}
+                  className="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 transition-all"
+                  placeholder="Contoh: 628123456789"
+                />
+                <p className="text-[10px] text-slate-500 italic">Gunakan format internasional tanpa tanda + (contoh: 628...)</p>
+              </div>
+            </div>
+          </div>
+        </div>
 
+        {/* Submit Button at Bottom */}
+        <div className="flex justify-end pt-6">
+          <button 
+            type="submit"
+            disabled={saving}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-xl shadow-blue-900/20 disabled:opacity-50 active:scale-95"
+          >
+            {saving ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
+            Simpan Semua Perubahan
+          </button>
         </div>
       </form>
 

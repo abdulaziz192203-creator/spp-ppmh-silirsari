@@ -130,22 +130,22 @@ export default function UploadProofModal({ payment, isOpen, onClose, onSuccess }
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            className="relative bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-md shadow-2xl overflow-hidden"
+            className="relative bg-white border border-slate-200 rounded-[32px] w-full max-w-md shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden"
           >
             {/* Header */}
-            <div className="p-6 border-b border-slate-800 flex items-center justify-between">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
               <div className="flex items-center gap-3">
                 {step === 2 && (
-                    <button onClick={() => setStep(1)} className="text-slate-500 hover:text-white transition-colors">
+                    <button onClick={() => setStep(1)} className="text-slate-400 hover:text-blue-600 transition-colors">
                         <ArrowLeft size={20} />
                     </button>
                 )}
-                <h2 className="text-xl font-bold font-outfit">
-                    {step === 1 ? "Pilih Metode Pembayaran" : "Konfirmasi Pembayaran"}
+                <h2 className="text-lg font-bold font-outfit text-slate-800 uppercase tracking-wide">
+                    {step === 1 ? "Pilih Metode" : "Konfirmasi"}
                 </h2>
               </div>
-              <button onClick={onClose} className="text-slate-500 hover:text-white">
-                <X size={20} />
+              <button onClick={onClose} className="text-slate-300 hover:text-red-500 transition-colors">
+                <X size={24} />
               </button>
             </div>
 
@@ -173,23 +173,23 @@ export default function UploadProofModal({ payment, isOpen, onClose, onSuccess }
                                                     setSelectedMethod(method)
                                                     setStep(2)
                                                 }}
-                                                className="w-full group bg-slate-800/30 hover:bg-slate-800 border border-slate-800/50 hover:border-blue-500/30 rounded-2xl p-4 flex items-center justify-between transition-all"
+                                                className="w-full group bg-white hover:bg-blue-50 border border-slate-100 hover:border-blue-200 rounded-2xl p-4 flex items-center justify-between transition-all shadow-sm active:scale-[0.98]"
                                             >
                                                 <div className="flex items-center gap-4">
                                                     <div className={cn(
-                                                        "h-10 w-10 rounded-xl flex items-center justify-center shadow-lg",
-                                                        method.category === 'QRIS' ? "bg-purple-500/10 text-purple-400" :
-                                                        method.category === 'E-Wallet' ? "bg-blue-500/10 text-blue-400" : "bg-emerald-500/10 text-emerald-400"
+                                                        "h-10 w-10 rounded-xl flex items-center justify-center shadow-md",
+                                                        method.category === 'QRIS' ? "bg-purple-100 text-purple-600" :
+                                                        method.category === 'E-Wallet' ? "bg-blue-100 text-blue-600" : "bg-emerald-100 text-emerald-600"
                                                     )}>
                                                         {method.category === 'QRIS' ? <QrCode size={20} /> :
                                                          method.category === 'E-Wallet' ? <Wallet size={20} /> : <Building2 size={20} />}
                                                     </div>
                                                     <div className="text-left">
-                                                        <p className="font-bold text-sm">{method.name}</p>
-                                                        <p className="text-[10px] text-slate-500">{method.account_number || "Klik untuk detail"}</p>
+                                                        <p className="font-bold text-sm text-slate-800">{method.name}</p>
+                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{method.account_number || "Klik untuk detail"}</p>
                                                     </div>
                                                 </div>
-                                                <ChevronRight size={18} className="text-slate-600 group-hover:text-blue-500 transition-colors" />
+                                                <ChevronRight size={18} className="text-slate-200 group-hover:text-blue-600 transition-colors" />
                                             </button>
                                         ))}
                                     </div>
@@ -204,12 +204,12 @@ export default function UploadProofModal({ payment, isOpen, onClose, onSuccess }
                   {/* Selected Method Summary */}
                   <div className="bg-blue-500/5 border border-blue-500/10 rounded-2xl p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-blue-500 text-white rounded-xl flex items-center justify-center font-black text-[10px]">
-                            {selectedMethod.name.substring(0, 3)}
+                        <div className="h-10 w-10 bg-blue-600 text-white rounded-xl flex items-center justify-center font-black text-[10px] shadow-lg shadow-blue-500/20">
+                            {selectedMethod.name.substring(0, 3).toUpperCase()}
                         </div>
                         <div>
-                            <p className="text-xs text-slate-500">Metode Terpilih</p>
-                            <p className="font-bold text-sm tracking-wide">{selectedMethod.name}</p>
+                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest leading-none">Pilihan</p>
+                            <p className="font-bold text-sm text-slate-800">{selectedMethod.name}</p>
                         </div>
                     </div>
                     <button onClick={() => setStep(1)} className="text-[10px] font-bold text-blue-400 uppercase tracking-wider hover:underline">
@@ -223,17 +223,17 @@ export default function UploadProofModal({ payment, isOpen, onClose, onSuccess }
                       {(selectedMethod.category !== 'QRIS' || (selectedMethod.account_number && selectedMethod.account_name)) && (
                           <div className="space-y-4">
                             <div>
-                                <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mb-2">Tujuan Transfer</p>
-                                <div className="flex items-center justify-between bg-slate-900/50 p-4 rounded-xl border border-slate-800">
+                                <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-2 text-center">Tujuan Transfer</p>
+                                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
                                     <div>
-                                        <p className="text-sm font-black font-mono tracking-wider">{selectedMethod.account_number || '-'}</p>
-                                        <p className="text-[10px] text-slate-500 mt-1 uppercase">Atas Nama: {selectedMethod.account_name || '-'}</p>
+                                        <p className="text-sm font-black text-slate-800 tracking-wider font-mono">{selectedMethod.account_number || '-'}</p>
+                                        <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tight">Atas Nama: {selectedMethod.account_name || '-'}</p>
                                     </div>
                                     <button 
                                         onClick={() => handleCopy(selectedMethod.account_number)}
                                         className={cn(
-                                            "p-2 rounded-lg transition-all",
-                                            copied ? "bg-green-500 text-white" : "bg-blue-600/10 text-blue-400 hover:bg-blue-600/20"
+                                            "p-3 rounded-xl transition-all",
+                                            copied ? "bg-green-600 text-white" : "bg-blue-100 text-blue-600 hover:bg-blue-200"
                                         )}
                                     >
                                         {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -256,12 +256,12 @@ export default function UploadProofModal({ payment, isOpen, onClose, onSuccess }
                           </div>
                       )}
 
-                      <div className="pt-4 border-t border-slate-800">
-                          <div className="flex justify-between items-center mb-1">
-                              <span className="text-xs text-slate-500 font-medium tracking-wide">TOTAL TAGIHAN</span>
-                              <span className="text-lg font-black text-white">Rp {payment.amount.toLocaleString('id-ID')}</span>
+                      <div className="pt-4 border-t border-slate-100">
+                          <div className="flex justify-between items-end mb-1">
+                              <span className="text-[10px] text-slate-400 font-black tracking-widest uppercase">Total Bayar</span>
+                              <span className="text-xl font-black text-blue-600 leading-none">Rp {payment.amount.toLocaleString('id-ID')}</span>
                           </div>
-                          <p className="text-[10px] text-slate-600 italic">Bulan {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, payment.month - 1))} {payment.year}</p>
+                          <p className="text-[9px] text-slate-300 font-bold uppercase tracking-tighter mt-1 text-right">Bulan {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, payment.month - 1))} {payment.year}</p>
                       </div>
                   </div>
 
@@ -269,16 +269,16 @@ export default function UploadProofModal({ payment, isOpen, onClose, onSuccess }
                   <div className="space-y-3">
                     <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest ml-1">Unggah Bukti Transfer</p>
                     <div 
-                        className="aspect-video bg-slate-950 border-2 border-dashed border-slate-800 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer hover:border-blue-500/50 transition-colors"
+                        className="aspect-video bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer hover:border-blue-400 transition-colors"
                         onClick={() => document.getElementById('file-upload')?.click()}
                     >
                         {preview ? (
                         <img src={preview} alt="Pratinjau" className="w-full h-full object-contain" />
                         ) : (
-                        <>
-                            <Upload size={24} className="text-slate-600 mb-1 group-hover:text-blue-500 transition-colors" />
-                            <p className="text-[10px] text-slate-500 text-center px-4 font-bold uppercase tracking-widest">Klik Untuk Unggah</p>
-                        </>
+                        <div className="flex flex-col items-center">
+                            <Upload size={24} className="text-slate-300 mb-2 group-hover:text-blue-600 transition-colors" />
+                            <p className="text-[10px] text-slate-300 text-center px-4 font-black uppercase tracking-widest">Sentuh Untuk Unggah</p>
+                        </div>
                         )}
                         <input 
                         id="file-upload"

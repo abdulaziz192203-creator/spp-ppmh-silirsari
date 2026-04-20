@@ -25,7 +25,7 @@ CREATE TABLE payments (
   month INTEGER CHECK (month >= 1 AND month <= 12) NOT NULL,
   year INTEGER NOT NULL,
   amount BIGINT NOT NULL,
-  status TEXT CHECK (status IN ('unpaid', 'pending', 'paid')) DEFAULT 'unpaid' NOT NULL,
+  status TEXT CHECK (status IN ('unpaid', 'pending', 'paid', 'rejected')) DEFAULT 'unpaid' NOT NULL,
   proof_url TEXT,
   verified_at TIMESTAMP WITH TIME ZONE,
   verified_by UUID REFERENCES profiles(id),

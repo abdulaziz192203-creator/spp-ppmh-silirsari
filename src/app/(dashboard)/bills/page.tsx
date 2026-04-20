@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
-import { formatCurrency } from "@/lib/utils"
-import { CreditCard, CheckCircle, Clock, AlertCircle, Upload, Search, Copy, Check, QrCode } from "lucide-react"
+import { formatCurrency, isPaymentOverdue } from "@/lib/utils"
+import { CreditCard, CheckCircle, Clock, AlertCircle, Upload, Search, Copy, Check, QrCode, AlertTriangle, XCircle } from "lucide-react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -22,7 +22,8 @@ export default function BillsPage() {
   const [settings, setSettings] = useState<any>({
     bank_name: "BSI",
     bank_account_number: "7123456789",
-    bank_account_name: "PP Miftahul Huda"
+    bank_account_name: "PP Miftahul Huda",
+    payment_deadline_day: "10"
   })
   const router = useRouter()
 
@@ -58,14 +59,16 @@ export default function BillsPage() {
       setSettings({
         bank_name: settingsObj.bank_name || "BSI",
         bank_account_number: settingsObj.bank_account_number || "7123456789",
-        bank_account_name: settingsObj.bank_account_name || "PP Miftahul Huda"
+        bank_account_name: settingsObj.bank_account_name || "PP Miftahul Huda",
+        payment_deadline_day: settingsObj.payment_deadline_day || "10"
       })
     }
   }
 
   const fetchPayments = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) return router.push("/")
 
       const { data: profile } = await supabase
@@ -111,57 +114,69 @@ export default function BillsPage() {
   )
 
   return (
-    <div className="space-y-8 pb-20">
-      <div>
-        <h1 className="text-3xl font-bold font-outfit">Tagihan Bulanan</h1>
-        <p className="text-slate-400">Daftar kewajiban SPP santri per bulan.</p>
+    <div className="min-h-screen bg-slate-50 -mt-24 -mx-6 md:-mx-12 pb-24 md:pb-12">
+      {/* Blue Header Section with Background Image */}
+      <div className="bg-blue-600 bg-gradient-to-b from-blue-700 to-blue-600 rounded-b-[40px] pt-24 pb-12 px-6 shadow-2xl relative overflow-hidden text-center flex flex-col items-center">
+         {/* Building Background Image */}
+         <div className="absolute inset-0 opacity-30 pointer-events-none">
+            <img 
+              src="/building.jpg" 
+              alt="Building" 
+              className="w-full h-full object-cover mix-blend-overlay"
+              onError={(e) => (e.currentTarget.style.display = 'none')} 
+            />
+         </div>
+         <div className="absolute inset-0 opacity-10 pointer-events-none">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -mr-20 -mt-20 blur-3xl"></div>
+         </div>
+         <h1 className="text-3xl font-bold font-outfit text-white relative z-10 uppercase tracking-wide">Tagihan Santri</h1>
+         <p className="text-white/70 relative z-10 max-w-md text-sm mt-2 font-medium">Lakukan pelunasan SPP sebelum <span className="text-white font-bold underline decoration-blue-400 underline-offset-4">tanggal {settings.payment_deadline_day}</span> setiap bulannya untuk menghindari keterlambatan.</p>
       </div>
 
-      <div className="flex items-center gap-3 bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50 max-w-md">
-        <Search size={18} className="text-slate-500 ml-2" />
-        <input 
-          type="text"
-          placeholder="Cari bulan atau tahun..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1 bg-transparent border-none outline-none text-slate-200 text-sm py-1.5"
-        />
-      </div>
-
-      {/* Payment Instructions Card */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-card rounded-3xl p-10 border border-blue-500/20 bg-blue-500/5 mb-8"
-      >
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-10">
-            <div className="flex-1">
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="h-14 w-14 bg-blue-600/10 text-blue-400 rounded-2xl flex items-center justify-center">
-                        <CreditCard size={32} />
-                    </div>
-                    <div>
-                        <h3 className="text-2xl font-bold">Instruksi Pembayaran</h3>
-                        <p className="text-sm text-slate-400">Silakan ikuti langkah-langkah di bawah ini untuk setor pembayaran.</p>
-                    </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 bg-slate-950/50 p-8 rounded-3xl border border-slate-800/50">
-                    {[
-                        "Pilih salah satu kotak tagihan di bawah ini.",
-                        "Tentukan metode pembayaran favorit Anda.",
-                        "Lakukan pembayaran sesuai instruksi/QR.",
-                        "Upload bukti pembayaran untuk diverifikasi."
-                    ].map((step, i) => (
-                        <div key={i} className="flex flex-col gap-4 text-center items-center">
-                            <span className="h-10 w-10 rounded-full bg-blue-600/10 text-blue-400 flex items-center justify-center shrink-0 font-black text-sm border border-blue-500/20 shadow-lg shadow-blue-500/10">{i+1}</span>
-                            <p className="text-xs text-slate-300 leading-relaxed font-medium">{step}</p>
-                        </div>
-                    ))}
-                </div>
-            </div>
+      <div className="px-6 pt-10 space-y-8 max-w-4xl mx-auto">
+        <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+          <Search size={20} className="text-slate-400 ml-2" />
+          <input 
+            type="text"
+            placeholder="Cari bulan atau tahun..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 bg-transparent border-none outline-none text-slate-800 text-sm py-1.5 font-medium placeholder:text-slate-300"
+          />
         </div>
-      </motion.div>
+
+        {/* Payment Instructions Card */}
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="bg-white rounded-[32px] p-8 border border-slate-100 shadow-xl"
+        >
+          <div className="flex flex-col gap-6">
+              <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center">
+                      <CreditCard size={24} />
+                  </div>
+                  <div>
+                      <h3 className="text-lg font-bold text-slate-800">Alur Pembayaran</h3>
+                      <p className="text-xs text-slate-400">Ikuti langkah mudah berikut ini</p>
+                  </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                  {[
+                      "Pilih Tagihan",
+                      "Pilih Metode",
+                      "Setor / Transfer",
+                      "Upload Bukti"
+                  ].map((step, i) => (
+                      <div key={i} className="flex items-center gap-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 transition-colors">
+                          <span className="h-7 w-7 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 font-bold text-[10px] shadow-lg shadow-blue-500/20">{i+1}</span>
+                          <p className="text-[10px] text-slate-600 font-bold uppercase tracking-tight">{step}</p>
+                      </div>
+                  ))}
+              </div>
+          </div>
+        </motion.div>
 
       <div className="grid grid-cols-1 gap-4">
         {filteredPayments.length === 0 ? (
@@ -177,75 +192,85 @@ export default function BillsPage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: idx * 0.05 }}
               onClick={() => {
-                if (payment.status === 'unpaid') {
+                if (payment.status === 'unpaid' || payment.status === 'rejected') {
                   setSelectedPayment(payment)
                   setIsModalOpen(true)
                 }
               }}
               className={cn(
-                "glass rounded-3xl p-6 transition-all group border border-slate-800/50 block",
-                payment.status === 'unpaid' ? "cursor-pointer hover:border-blue-500/50 hover:bg-slate-900/50" : "opacity-80"
+                "bg-white rounded-[32px] p-6 transition-all group border shadow-sm",
+                (payment.status === 'unpaid' || payment.status === 'rejected') && isPaymentOverdue(payment.month, payment.year, parseInt(settings.payment_deadline_day)) 
+                  ? "border-red-200 bg-red-50/50" 
+                  : "border-slate-100",
+                (payment.status === 'unpaid' || payment.status === 'rejected') ? "cursor-pointer hover:border-blue-400 hover:shadow-xl hover:shadow-blue-500/5 active:scale-[0.98]" : "opacity-80"
               )}
             >
               <div className="flex flex-col md:flex-row md:items-center justify-between">
                   <div className="flex items-center gap-5 mb-4 md:mb-0">
                     <div className={cn(
-                      "h-14 w-14 rounded-2xl flex items-center justify-center shadow-lg",
-                      payment.status === 'paid' ? "bg-green-500/10 text-green-500" :
-                      payment.status === 'pending' ? "bg-amber-500/10 text-amber-500" : "bg-red-500/10 text-red-500"
+                      "h-14 w-14 rounded-2xl flex items-center justify-center shadow-md",
+                      payment.status === 'paid' ? "bg-green-100 text-green-600" :
+                      payment.status === 'pending' ? "bg-amber-100 text-amber-600" : "bg-red-100 text-red-600"
                     )}>
-                      {payment.status === 'paid' ? <CheckCircle size={28} /> :
-                       payment.status === 'pending' ? <Clock size={28} /> : <AlertCircle size={28} />}
+                      {payment.status === 'paid' ? <CheckCircle size={24} /> :
+                       payment.status === 'pending' ? <Clock size={24} /> : 
+                       payment.status === 'rejected' ? <XCircle size={24} /> : <AlertCircle size={24} />}
                     </div>
                     <div>
-                      <h4 className="font-bold text-lg">SPP Bulan {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, payment.month - 1))}</h4>
-                      <p className="text-sm text-slate-500 font-medium">{payment.year} • <span className="text-blue-400 font-bold">{formatCurrency(payment.amount)}</span></p>
+                      <h4 className="font-bold text-lg text-slate-800 leading-tight">SPP {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, payment.month - 1))}</h4>
+                      <p className="text-xs text-slate-400 font-bold mt-1 uppercase tracking-widest">
+                        {payment.year} • <span className="text-blue-600">{formatCurrency(payment.amount)}</span>
+                        {(payment.status === 'unpaid' || payment.status === 'rejected') && (
+                          <span className="block text-[10px] text-amber-500 mt-1 font-medium lowercase first-letter:uppercase">
+                            Batas Bayar: Tgl {settings.payment_deadline_day} {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, payment.month - 1))} {payment.year}
+                          </span>
+                        )}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-none border-slate-800 pt-4 md:pt-0">
+                  <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-none border-slate-50 pt-4 md:pt-0">
                     <div className="flex flex-col items-end">
                         <span className={cn(
-                        "text-[10px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-full border",
-                        payment.status === 'paid' ? "bg-green-500/10 text-green-400 border-green-500/20" :
-                        payment.status === 'pending' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" : "bg-red-500/10 text-red-400 border-red-500/20"
+                        "text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1.5 rounded-full border",
+                        payment.status === 'paid' ? "bg-green-100 text-green-700 border-green-200" :
+                        payment.status === 'pending' ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-red-100 text-red-700 border-red-200"
                         )}>
-                        {payment.status === 'paid' ? 'Sudah Lunas' : payment.status === 'pending' ? 'Sedang Diverifikasi' : 'Belum Lunas'}
+                        {payment.status === 'paid' ? 'LUNAS' : 
+                         payment.status === 'pending' ? 'PROSES' : 
+                         payment.status === 'rejected' ? 'DITOLAK' :
+                         isPaymentOverdue(payment.month, payment.year, parseInt(settings.payment_deadline_day)) ? 'TERLAMBAT' : 'BELUM BAYAR'}
                         </span>
-                        {payment.status === 'unpaid' && (
-                            <p className="text-[10px] text-blue-400 mt-2 font-bold animate-pulse">Klik untuk Bayar</p>
-                        )}
                     </div>
-                    {payment.status === 'unpaid' && (
-                      <div className="bg-blue-600 text-white p-3 rounded-2xl shadow-lg shadow-blue-900/40 group-hover:scale-110 transition-transform md:ml-4">
+                    {(payment.status === 'unpaid' || payment.status === 'rejected') && (
+                      <div className="bg-blue-600 text-white p-3 rounded-2xl shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform md:ml-4">
                         <Upload size={20} />
                       </div>
                     )}
                   </div>
               </div>
               
-              <div className="w-full mt-4 pt-4 border-t border-slate-800/50">
-                  <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wider">Perincian Tagihan Standar</p>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs text-slate-400">
-                      <div className="bg-slate-900/30 p-2 rounded-lg border border-slate-800/50">
-                          <p className="opacity-70 mb-1 scale-90 origin-left">Kos Makan</p>
-                          <p className="font-semibold text-slate-300">Rp 100.000</p>
+              <div className="w-full mt-4 pt-4 border-t border-slate-50">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          <p className="opacity-50 mb-1 scale-90 origin-left">Kos Makan</p>
+                          <p className="text-slate-600">Rp 100k</p>
                       </div>
-                      <div className="bg-slate-900/30 p-2 rounded-lg border border-slate-800/50">
-                          <p className="opacity-70 mb-1 scale-90 origin-left">Sekolah Diniah</p>
-                          <p className="font-semibold text-slate-300">Rp 50.000</p>
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          <p className="opacity-50 mb-1 scale-90 origin-left">Sekolah Diniah</p>
+                          <p className="text-slate-600">Rp 50k</p>
                       </div>
-                      <div className="bg-slate-900/30 p-2 rounded-lg border border-slate-800/50">
-                          <p className="opacity-70 mb-1 scale-90 origin-left">Sekolah Formal</p>
-                          <p className="font-semibold text-slate-300">Rp 50.000</p>
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          <p className="opacity-50 mb-1 scale-90 origin-left">Sekolah Formal</p>
+                          <p className="text-slate-600">Rp 50k</p>
                       </div>
-                      <div className="bg-slate-900/30 p-2 rounded-lg border border-slate-800/50">
-                          <p className="opacity-70 mb-1 scale-90 origin-left">Listrik & Kes</p>
-                          <p className="font-semibold text-slate-300">Rp 25.000</p>
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          <p className="opacity-50 mb-1 scale-90 origin-left">Listrik & Kes</p>
+                          <p className="text-slate-600">Rp 25k</p>
                       </div>
-                      <div className="bg-slate-900/30 p-2 rounded-lg border border-slate-800/50">
-                          <p className="opacity-70 mb-1 scale-90 origin-left">Uang Gedung</p>
-                          <p className="font-semibold text-slate-300">Rp 25.000</p>
+                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                          <p className="opacity-50 mb-1 scale-90 origin-left">Uang Gedung</p>
+                          <p className="text-slate-600">Rp 25k</p>
                       </div>
                   </div>
               </div>
@@ -265,6 +290,7 @@ export default function BillsPage() {
             }}
         />
       )}
+      </div>
     </div>
   )
 }

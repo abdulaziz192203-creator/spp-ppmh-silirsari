@@ -12,10 +12,16 @@ import {
   LogOut, 
   ChevronRight, 
   Menu as MenuIcon, 
-  X 
+  X,
+  Bell,
+  AlertTriangle,
+  Newspaper,
+  QrCode,
+  CreditCard as MutasiIcon
 } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, isPaymentOverdue, getMonthName } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
+import PushNotificationManager from "@/components/PushNotificationManager"
 
 export default function ParentLayout({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
@@ -23,6 +29,9 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [unpaidCount, setUnpaidCount] = useState(0)
+  const [overdueCount, setOverdueCount] = useState(0)
+  const [overdueList, setOverdueList] = useState<any[]>([])
+  const [showNotifications, setShowNotifications] = useState(false)
   const pathname = usePathname()
   const router = useRouter()
 
@@ -49,20 +58,29 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       setAuthenticated(true)
       setLoading(false)
       
-      // Fetch unpaid count
-      if (profile?.role === 'parent' && profile?.nisn) {
-        const { count } = await supabase
+        const { data: payments } = await supabase
           .from("payments")
-          .select("*", { count: 'exact', head: true })
-          .eq("nisn", profile.nisn)
-          .eq("status", "unpaid")
+          .select("*")
+          .eq("student_id", (
+            await supabase.from("students").select("id").eq("nisn", profile.nisn).single()
+          ).data?.id)
         
-        setUnpaidCount(count || 0)
+        if (payments) {
+          const unpaid = payments.filter(p => p.status === 'unpaid' || p.status === 'rejected')
+          setUnpaidCount(unpaid.length)
+          
+          // Fetch deadline
+          const { data: settings } = await supabase.from("system_settings").select("value").eq("key", "payment_deadline_day").single()
+          const deadline = settings ? parseInt(settings.value) : 10
+          
+          const overdue = unpaid.filter(p => isPaymentOverdue(p.month, p.year, deadline))
+          setOverdueCount(overdue.length)
+          setOverdueList(overdue)
+        }
       }
-    }
 
-    checkAuth()
-  }, [router, pathname])
+      checkAuth()
+    }, [router])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -232,13 +250,133 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
       </AnimatePresence>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto min-w-0">
-        <div className="p-6 md:p-12 max-w-5xl mx-auto min-h-screen">
+      <main className="flex-1 overflow-y-auto min-w-0 pb-20 md:pb-0">
+        <div className="p-6 md:p-12 max-w-5xl mx-auto min-h-screen relative">
           <div className="pt-24 md:pt-0">
+            {/* Top Navigation / Header for Desktop */}
+            <header className="hidden md:flex items-center justify-end mb-8 gap-4">
+               <div className="relative">
+                  <button 
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="h-12 w-12 bg-slate-900/50 border border-slate-800 rounded-2xl flex items-center justify-center text-slate-400 hover:text-white transition-all relative"
+                  >
+                    <Bell size={20} />
+                    {overdueCount > 0 && (
+                      <span className="absolute top-2.5 right-2.5 h-2.5 w-2.5 bg-red-500 rounded-full border-2 border-slate-950 animate-pulse" />
+                    )}
+                  </button>
+
+                  <AnimatePresence>
+                    {showNotifications && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowNotifications(false)} />
+                        <motion.div 
+                          initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                          className="absolute right-0 mt-3 w-80 bg-slate-900 border border-slate-800 rounded-3xl shadow-2xl z-50 overflow-hidden"
+                        >
+                          <div className="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+                            <h3 className="font-bold font-outfit">Notifikasi</h3>
+                            {overdueCount > 0 && (
+                              <span className="bg-red-500/10 text-red-400 text-[10px] font-black px-2 py-1 rounded-full border border-red-500/20 uppercase tracking-wider">
+                                {overdueCount} Terlambat
+                              </span>
+                            )}
+                          </div>
+                          <div className="max-h-[300px] overflow-y-auto">
+                            {overdueList.length === 0 ? (
+                              <div className="p-10 text-center text-slate-500">
+                                <Bell className="mx-auto mb-3 opacity-20" size={32} />
+                                <p className="text-xs">Tidak ada notifikasi baru</p>
+                              </div>
+                            ) : (
+                              <div className="divide-y divide-slate-800/50">
+                                {overdueList.map((p, i) => (
+                                  <div key={i} className="p-4 hover:bg-slate-800/30 transition-colors flex gap-3">
+                                    <div className="h-10 w-10 bg-red-500/10 text-red-400 rounded-xl flex items-center justify-center shrink-0">
+                                      <AlertTriangle size={18} />
+                                    </div>
+                                    <div>
+                                      <p className="text-xs font-bold text-slate-200">SPP {getMonthName(p.month)} {p.year} Terlambat</p>
+                                      <p className="text-[10px] text-slate-500 mt-1">Batas pembayaran telah terlewati. Segera lakukan pelunasan.</p>
+                                      <button 
+                                        onClick={() => {
+                                          router.push('/bills')
+                                          setShowNotifications(false)
+                                        }}
+                                        className="text-[10px] text-blue-400 font-bold mt-2 hover:underline"
+                                      >
+                                        Bayar Sekarang →
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="p-3 bg-slate-950/50 border-t border-slate-800 text-center">
+                            <button 
+                              onClick={() => {
+                                router.push('/bills')
+                                setShowNotifications(false)
+                              }}
+                              className="text-xs text-slate-400 hover:text-white transition-colors"
+                            >
+                              Lihat Semua Tagihan
+                            </button>
+                          </div>
+                        </motion.div>
+                      </>
+                    )}
+                  </AnimatePresence>
+               </div>
+            </header>
             {children}
           </div>
         </div>
       </main>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-[100] px-4 py-2 flex items-center justify-between shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+         <button 
+           onClick={() => router.push('/dashboard')}
+           className={cn("flex flex-col items-center gap-1 min-w-[64px]", pathname === '/dashboard' ? "text-blue-600" : "text-slate-400")}
+         >
+            <BarChart size={20} />
+            <span className="text-[10px] font-bold">Beranda</span>
+         </button>
+         
+         <button 
+           onClick={() => router.push('/bills')}
+           className={cn("flex flex-col items-center gap-1 min-w-[64px] relative", pathname === '/bills' ? "text-blue-600" : "text-slate-400")}
+         >
+            <CreditCard size={20} />
+            <span className="text-[10px] font-bold">Tagihan</span>
+            {unpaidCount > 0 && (
+              <span className="absolute -top-1 right-2 bg-red-500 text-white text-[8px] font-black rounded-full h-4 w-4 flex items-center justify-center shadow-lg shadow-red-900/40">
+                {unpaidCount}
+              </span>
+            )}
+         </button>
+
+         <button 
+           onClick={() => router.push('/history')}
+           className={cn("flex flex-col items-center gap-1 min-w-[64px]", pathname === '/history' ? "text-blue-600" : "text-slate-400")}
+         >
+            <MutasiIcon size={20} />
+            <span className="text-[10px] font-bold">Mutasi</span>
+         </button>
+
+         <button 
+           onClick={() => router.push('/profile')}
+           className={cn("flex flex-col items-center gap-1 min-w-[64px]", pathname === '/profile' ? "text-blue-600" : "text-slate-400")}
+         >
+            <User size={20} />
+            <span className="text-[10px] font-bold">Profil</span>
+         </button>
+      </nav>
+      <PushNotificationManager />
     </div>
   )
 }

@@ -17,7 +17,8 @@ export default function HistoryPage() {
 
   const fetchHistory = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
       if (!user) return
 
       // Get profile to find NISN
@@ -61,23 +62,31 @@ export default function HistoryPage() {
   )
 
   return (
-    <div className="space-y-8 pb-12">
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-10 w-10 bg-blue-600/10 text-blue-400 rounded-xl flex items-center justify-center font-bold">
-            <HistoryIcon size={24} />
-          </div>
-          <h1 className="text-2xl font-bold font-outfit">Riwayat Bayar</h1>
-        </div>
-        <p className="text-slate-400 text-sm">Catatan pembayaran SPP yang telah diunggah.</p>
+    <div className="min-h-screen bg-slate-50 -mt-24 -mx-6 md:-mx-12 pb-24 md:pb-12">
+      {/* Blue Header Section with Background Image */}
+      <div className="bg-blue-600 bg-gradient-to-b from-blue-700 to-blue-600 rounded-b-[40px] pt-24 pb-12 px-6 shadow-2xl relative overflow-hidden text-center flex flex-col items-center">
+         {/* Building Background Image */}
+         <div className="absolute inset-0 opacity-30 pointer-events-none">
+            <img 
+              src="/building.jpg" 
+              alt="Building" 
+              className="w-full h-full object-cover mix-blend-overlay"
+              onError={(e) => (e.currentTarget.style.display = 'none')} 
+            />
+         </div>
+         <div className="absolute inset-0 opacity-10 pointer-events-none">
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full -ml-20 -mb-20 blur-3xl"></div>
+         </div>
+         <h1 className="text-3xl font-bold font-outfit text-white relative z-10 uppercase tracking-wide">Riwayat Mutasi</h1>
+         <p className="text-white/70 relative z-10 max-w-md text-sm mt-2 font-medium">Pantau seluruh catatan transaksi dan status verifikasi pembayaran Anda.</p>
       </div>
 
-      <div className="space-y-4">
+      <div className="px-6 pt-10 space-y-4 max-w-4xl mx-auto">
         {payments.length === 0 ? (
-          <div className="text-center py-20 glass rounded-3xl border border-slate-800/50">
-            <Search className="mx-auto mb-4 text-slate-700" size={48} />
-            <p className="text-slate-500 font-medium">Belum ada riwayat pembayaran.</p>
-            <p className="text-slate-600 text-xs mt-1">Lakukan pembayaran di menu Tagihan.</p>
+          <div className="text-center py-20 bg-white rounded-3xl border border-slate-100 shadow-sm">
+            <Search className="mx-auto mb-4 text-slate-200" size={48} />
+            <p className="text-slate-400 font-bold uppercase tracking-tight text-sm">Belum Ada Transaksi</p>
+            <p className="text-slate-300 text-[10px] mt-1">Tagihan yang dibayar akan muncul di sini.</p>
           </div>
         ) : (
           payments.map((payment, idx) => (
@@ -86,37 +95,37 @@ export default function HistoryPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className="glass rounded-2xl p-5 border border-slate-800/50 hover:border-blue-500/30 transition-all"
+              className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-md transition-all"
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                   <div className={cn(
-                    "h-12 w-12 rounded-2xl flex items-center justify-center",
-                    payment.status === 'paid' ? "bg-green-500/10 text-green-400" : "bg-amber-500/10 text-amber-400"
+                    "h-12 w-12 rounded-2xl flex items-center justify-center shadow-sm",
+                    payment.status === 'paid' ? "bg-green-100 text-green-600" : "bg-amber-100 text-amber-600"
                   )}>
-                    {payment.status === 'paid' ? <CheckCircle size={24} /> : <Clock size={24} />}
+                    {payment.status === 'paid' ? <CheckCircle size={22} /> : <Clock size={22} />}
                   </div>
                   <div>
-                    <h4 className="font-bold">SPP {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, payment.month - 1))} {payment.year}</h4>
-                    <p className="text-xs text-slate-500">Dibayar pada {formatDate(payment.created_at)}</p>
+                    <h4 className="font-bold text-slate-800 leading-tight">SPP {new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, payment.month - 1))} {payment.year}</h4>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 tracking-tight">{formatDate(payment.created_at)}</p>
                   </div>
                 </div>
                 <div className={cn(
-                  "text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-full border",
+                  "text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full border",
                   payment.status === 'paid' 
-                    ? "bg-green-500/10 text-green-400 border-green-500/20" 
-                    : "bg-amber-500/10 text-amber-400 border-amber-500/20"
+                    ? "bg-green-100 text-green-700 border-green-200" 
+                    : "bg-amber-100 text-amber-700 border-amber-200"
                 )}>
-                  {payment.status === 'paid' ? 'Lunas' : 'Menunggu Verifikasi'}
+                  {payment.status === 'paid' ? 'LUNAS' : 'PROSES'}
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-slate-800/50">
+              <div className="flex items-center justify-between pt-4 border-t border-slate-50">
                 <div className="flex items-center gap-2 text-slate-400">
                   <CreditCard size={14} />
-                  <span className="text-xs">Nominal Transfer</span>
+                  <span className="text-[10px] font-bold uppercase tracking-tight">Nominal</span>
                 </div>
-                <span className="font-bold text-blue-400">{formatCurrency(payment.amount)}</span>
+                <span className="font-bold text-blue-600">{formatCurrency(payment.amount)}</span>
               </div>
             </motion.div>
           ))

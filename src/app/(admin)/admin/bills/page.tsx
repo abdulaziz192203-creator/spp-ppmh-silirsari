@@ -15,6 +15,7 @@ import {
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { formatCurrency, cn } from "@/lib/utils"
+import { generateBulkBills } from "@/app/actions/bill-actions"
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,8 @@ export default function BillsPage() {
   const [stats, setStats] = useState({ total: 0, paid: 0, pending: 0, unpaid: 0 })
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [deadlineDay, setDeadlineDay] = useState(10)
+  const [savingDeadline, setSavingDeadline] = useState(false)
   const [details, setDetails] = useState({
     kosMakan: 100000,
     sekolahDiniah: 50000,
@@ -35,7 +38,37 @@ export default function BillsPage() {
 
   useEffect(() => {
     fetchStats()
+    fetchDeadline()
   }, [])
+
+  const fetchDeadline = async () => {
+    const { data } = await supabase
+      .from("system_settings")
+      .select("value")
+      .eq("key", "payment_deadline_day")
+      .single()
+    if (data) setDeadlineDay(Number(data.value))
+  }
+
+  const handleUpdateDeadline = async () => {
+    setSavingDeadline(true)
+    try {
+      const { error } = await supabase
+        .from("system_settings")
+        .upsert({ 
+          key: "payment_deadline_day", 
+          value: deadlineDay.toString(),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' })
+      
+      if (error) throw error
+      alert("Batas waktu pembayaran berhasil diperbarui!")
+    } catch (error: any) {
+      alert("Gagal memperbarui batas waktu: " + error.message)
+    } finally {
+      setSavingDeadline(false)
+    }
+  }
 
   const fetchStats = async () => {
     const { data: payments } = await supabase.from("payments").select("status, amount")
@@ -54,22 +87,14 @@ export default function BillsPage() {
     
     setLoading(true)
     try {
-      const { data: students } = await supabase.from("students").select("id")
-      if (!students) return
-
-      const billingData = students.map(s => ({
-        student_id: s.id,
-        month: selectedMonth,
-        year: selectedYear,
-        amount: amount,
-        status: 'unpaid'
-      }))
-
-      const { error } = await supabase.from("payments").insert(billingData)
-      if (error) throw error
-
-      alert("Tagihan berhasil digenerate untuk " + students.length + " santri.")
-      fetchStats()
+      const response = await generateBulkBills(selectedMonth, selectedYear, amount)
+      
+      if (response.success) {
+        alert(response.message)
+        fetchStats()
+      } else {
+        alert("Gagal: " + response.error)
+      }
     } catch (error: any) {
       alert("Gagal generate tagihan: " + error.message)
     } finally {
@@ -119,6 +144,35 @@ export default function BillsPage() {
                   <option value={2026}>2026</option>
                   <option value={2027}>2027</option>
                 </select>
+              </div>
+            </div>
+
+            <div className="bg-amber-500/5 border border-amber-500/10 p-5 rounded-2xl mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 bg-amber-500/10 text-amber-500 rounded-2xl flex items-center justify-center">
+                  <Calendar size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-slate-200">Batas Waktu Pembayaran</h4>
+                  <p className="text-xs text-slate-500">Jatuh tempo pembayaran setiap bulan.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="number"
+                  min="1"
+                  max="31"
+                  value={deadlineDay}
+                  onChange={(e) => setDeadlineDay(Number(e.target.value))}
+                  className="w-20 bg-slate-900 border border-slate-800 rounded-xl px-3 py-2.5 text-center font-bold text-amber-500 focus:ring-1 focus:ring-amber-500 outline-none"
+                />
+                <button 
+                  onClick={handleUpdateDeadline}
+                  disabled={savingDeadline}
+                  className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50"
+                >
+                  {savingDeadline ? <Loader2 size={14} className="animate-spin" /> : "Update"}
+                </button>
               </div>
             </div>
 
