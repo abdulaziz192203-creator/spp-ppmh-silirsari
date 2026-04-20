@@ -1,7 +1,5 @@
 import * as admin from 'firebase-admin';
 
-import * as admin from 'firebase-admin';
-
 // Initialize Firebase Admin using Environment Variables for Security
 if (!admin.apps.length) {
   try {
