@@ -11,11 +11,12 @@ import {
   Edit2,
   X,
   Check,
-  MessageCircle
+  MessageCircle,
+  Loader2
 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
-import { cn } from "@/lib/utils"
-import { createStudentWithAuth, deleteStudentWithAuth, updateStudent } from "@/app/actions/student-actions"
+import { cn, JENJANG_OPTIONS, getJenjangLabel, getJenjangColor } from "@/lib/utils"
+import { createStudentWithAuth, deleteStudentWithAuth, updateStudent, bulkDeleteStudents } from "@/app/actions/student-actions"
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,9 @@ export default function StudentsPage() {
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
+  const [searchQuery, setSearchQuery] = useState("")
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedStudent, setSelectedStudent] = useState<any>(null)
@@ -30,8 +34,9 @@ export default function StudentsPage() {
     name: "",
     nisn: "",
     class_room: "",
+    jenjang: "smp_mts",
     address: "",
-    password: "", // New password field
+    password: "",
     parent_name: "",
     parent_phone: ""
   })
@@ -54,13 +59,35 @@ export default function StudentsPage() {
     setLoading(false)
   }
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id])
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredStudents.length) setSelectedIds([])
+    else setSelectedIds(filteredStudents.map(s => s.id))
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Hapus ${selectedIds.length} data santri terpilih?`)) return
+    setIsBulkDeleting(true)
+    const { success, error } = await bulkDeleteStudents(selectedIds)
+    if (success) {
+      setSelectedIds([])
+      fetchStudents()
+    } else {
+      alert(error)
+    }
+    setIsBulkDeleting(false)
+  }
+
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     const response = await createStudentWithAuth(newStudent)
     if (response.success) {
       setIsModalOpen(false)
-      setNewStudent({ name: "", nisn: "", class_room: "", address: "", password: "", parent_name: "", parent_phone: "" })
+      setNewStudent({ name: "", nisn: "", class_room: "", jenjang: "smp_mts", address: "", password: "", parent_name: "", parent_phone: "" })
       fetchStudents()
       alert(response.message)
     } else {
@@ -89,6 +116,7 @@ export default function StudentsPage() {
     const response = await updateStudent(selectedStudent.id, {
       name: selectedStudent.name,
       class_room: selectedStudent.class_room,
+      jenjang: selectedStudent.jenjang,
       address: selectedStudent.address,
       parent_name: selectedStudent.parent_name,
       parent_phone: selectedStudent.parent_phone,
@@ -117,12 +145,23 @@ export default function StudentsPage() {
           <h1 className="text-3xl font-bold font-outfit">Data Santri</h1>
           <p className="text-slate-400">Kelola informasi santri dan akun orang tua.</p>
         </div>
-        <button 
-          onClick={() => setIsModalOpen(true)}
-          className="btn-primary flex items-center justify-center gap-2"
-        >
-          <Plus size={20} /> Tambah Santri
-        </button>
+        <div className="flex gap-2">
+          {selectedIds.length > 0 && (
+            <button 
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+              className="btn-danger flex items-center justify-center gap-2"
+            >
+              <Trash2 size={20} /> {isBulkDeleting ? "Menghapus..." : `Hapus (${selectedIds.length})`}
+            </button>
+          )}
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="btn-primary flex items-center justify-center gap-2"
+          >
+            <Plus size={20} /> Tambah Santri
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-4 bg-slate-900/50 p-2 rounded-2xl border border-slate-800/50">
@@ -144,25 +183,49 @@ export default function StudentsPage() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider">
+                <th className="px-6 py-4 font-semibold text-left w-10">
+                  <input 
+                    type="checkbox"
+                    checked={filteredStudents.length > 0 && selectedIds.length === filteredStudents.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500/50"
+                  />
+                </th>
                 <th className="px-6 py-4 font-semibold">Nama Santri</th>
                 <th className="px-6 py-4 font-semibold">NISN</th>
                 <th className="px-6 py-4 font-semibold">Kelas</th>
+                <th className="px-6 py-4 font-semibold">Jenjang</th>
                 <th className="px-6 py-4 font-semibold">Orang Tua</th>
                 <th className="px-6 py-4 font-semibold">No. WA</th>
-                <th className="px-6 py-4 font-semibold">Alamat</th>
                 <th className="px-6 py-4 font-semibold text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={9} className="px-6 py-12 text-center text-slate-500">
                     Tidak ada data santri ditemukan.
                   </td>
                 </tr>
               ) : (
                 filteredStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-900/30 transition-colors">
+                  <motion.tr 
+                    key={student.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className={cn(
+                      "border-b border-slate-800/50 hover:bg-slate-900/30 transition-colors",
+                      selectedIds.includes(student.id) && "bg-blue-500/5"
+                    )}
+                  >
+                    <td className="px-6 py-4">
+                      <input 
+                        type="checkbox"
+                        checked={selectedIds.includes(student.id)}
+                        onChange={() => toggleSelect(student.id)}
+                        className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500/50"
+                      />
+                    </td>
                     <td className="px-6 py-4 font-medium text-slate-200">{student.name}</td>
                     <td className="px-6 py-4 text-slate-400">{student.nisn}</td>
                     <td className="px-6 py-4">
@@ -170,9 +233,13 @@ export default function StudentsPage() {
                         {student.class_room}
                       </span>
                     </td>
+                    <td className="px-6 py-4">
+                      <span className={cn("px-2.5 py-1 rounded-lg text-xs font-medium border", getJenjangColor(student.jenjang || 'smp_mts'))}>
+                        {getJenjangLabel(student.jenjang || 'smp_mts')}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-slate-300">{student.parent_name || "-"}</td>
                     <td className="px-6 py-4 text-slate-400">{student.parent_phone || "-"}</td>
-                    <td className="px-6 py-4 text-slate-400 text-sm truncate max-w-[150px]">{student.address}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button 
@@ -205,7 +272,7 @@ export default function StudentsPage() {
                         </button>
                       </div>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))
               )}
             </tbody>
@@ -223,16 +290,32 @@ export default function StudentsPage() {
           filteredStudents.map((student) => (
             <motion.div 
               key={student.id}
-              className="glass-card rounded-2xl p-5 border border-slate-800/50 space-y-4"
+              className={cn(
+                "glass-card p-5 rounded-3xl border border-slate-800/50 relative overflow-hidden",
+                selectedIds.includes(student.id) && "border-blue-500/40 bg-blue-500/5"
+              )}
             >
-              <div className="flex justify-between items-start">
-                <div>
-                  <h4 className="font-bold text-slate-200">{student.name}</h4>
-                  <p className="text-xs text-slate-500 font-medium">NISN: {student.nisn}</p>
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox"
+                    checked={selectedIds.includes(student.id)}
+                    onChange={() => toggleSelect(student.id)}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500/50"
+                  />
+                  <div>
+                    <h4 className="font-bold text-slate-200">{student.name}</h4>
+                    <p className="text-xs text-slate-500 font-medium">NISN: {student.nisn}</p>
+                  </div>
                 </div>
-                <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded-lg text-[10px] font-bold uppercase">
-                  {student.class_room}
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded-lg text-[10px] font-bold uppercase">
+                    {student.class_room}
+                  </span>
+                  <span className={cn("px-2 py-1 rounded-lg text-[10px] font-bold border", getJenjangColor(student.jenjang || 'smp_mts'))}>
+                    {getJenjangLabel(student.jenjang || 'smp_mts')}
+                  </span>
+                </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4 text-xs">
@@ -328,6 +411,20 @@ export default function StudentsPage() {
                       placeholder="Contoh: 001234567"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Jenjang Sekolah</label>
+                    <select
+                      value={newStudent.jenjang}
+                      onChange={(e) => setNewStudent({...newStudent, jenjang: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 outline-none appearance-none"
+                    >
+                      {JENJANG_OPTIONS.map(j => (
+                        <option key={j.value} value={j.value}>{j.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm text-slate-400 mb-1">Kelas</label>
                     <input 
@@ -452,6 +549,20 @@ export default function StudentsPage() {
                       className="w-full bg-slate-950/50 border border-slate-800 text-slate-500 rounded-xl px-4 py-3 outline-none cursor-not-allowed"
                     />
                   </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Jenjang Sekolah</label>
+                    <select
+                      value={selectedStudent.jenjang || 'smp_mts'}
+                      onChange={(e) => setSelectedStudent({...selectedStudent, jenjang: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 outline-none appearance-none"
+                    >
+                      {JENJANG_OPTIONS.map(j => (
+                        <option key={j.value} value={j.value}>{j.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm text-slate-400 mb-1">Kelas</label>
                     <input 

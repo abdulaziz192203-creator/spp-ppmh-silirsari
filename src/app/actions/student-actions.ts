@@ -7,13 +7,14 @@ export async function createStudentWithAuth(formData: {
   name: string
   nisn: string
   class_room: string
+  jenjang: string
   address: string
   password?: string
   parent_name?: string
   parent_phone?: string
 }) {
   try {
-    const { name, nisn, class_room, address, password, parent_name, parent_phone } = formData
+    const { name, nisn, class_room, jenjang, address, password, parent_name, parent_phone } = formData
     const loginEmail = `${nisn}@spp-ppmh.id`
     const loginPassword = password || `santri${nisn}` // Default password
 
@@ -61,6 +62,7 @@ export async function createStudentWithAuth(formData: {
           name, 
           nisn, 
           class_room, 
+          jenjang,
           address,
           parent_name,
           parent_phone,
@@ -119,18 +121,19 @@ export async function deleteStudentWithAuth(studentId: string, parentId: string)
 export async function updateStudent(studentId: string, formData: {
   name: string
   class_room: string
+  jenjang: string
   address: string
   parent_name?: string
   parent_phone?: string
   parentId?: string
 }) {
   try {
-    const { name, class_room, address, parent_name, parent_phone, parentId } = formData
+    const { name, class_room, jenjang, address, parent_name, parent_phone, parentId } = formData
 
     // 1. Update students table
     const { error: studentError } = await supabaseAdmin
       .from("students")
-      .update({ name, class_room, address, parent_name, parent_phone })
+      .update({ name, class_room, jenjang, address, parent_name, parent_phone })
       .eq("id", studentId)
 
     if (studentError) throw new Error(`Gagal update data santri: ${studentError.message}`)
@@ -150,6 +153,44 @@ export async function updateStudent(studentId: string, formData: {
 
     revalidatePath("/admin/students")
     return { success: true, message: "Data santri berhasil diperbarui!" }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function bulkDeleteStudents(studentIds: string[]) {
+  try {
+    // 1. Get parentIds first
+    const { data: students, error: fetchError } = await supabaseAdmin
+      .from("students")
+      .select("id, parent_id")
+      .in("id", studentIds)
+    
+    if (fetchError) throw fetchError
+
+    const parentIds = students?.map(s => s.parent_id).filter(id => !!id) as string[]
+
+    // 2. Delete students
+    const { error: studentError } = await supabaseAdmin
+      .from("students")
+      .delete()
+      .in("id", studentIds)
+    
+    if (studentError) throw studentError
+
+    // 3. Delete from Auth and Profiles
+    if (parentIds.length > 0) {
+      // Profiles
+      await supabaseAdmin.from("profiles").delete().in("id", parentIds)
+      
+      // Auth (One by one since deleteUser only takes one ID)
+      for (const pid of parentIds) {
+        await supabaseAdmin.auth.admin.deleteUser(pid)
+      }
+    }
+
+    revalidatePath("/admin/students")
+    return { success: true, message: `${studentIds.length} santri berhasil dihapus.` }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

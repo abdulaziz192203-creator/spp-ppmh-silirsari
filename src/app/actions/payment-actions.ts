@@ -60,3 +60,20 @@ export async function verifyPayment(id: string, status: 'paid' | 'rejected') {
     return { success: false, error: error.message }
   }
 }
+
+export async function bulkDeletePayments(ids: string[]) {
+  try {
+    const { error } = await supabaseAdmin
+      .from("payments")
+      .delete()
+      .in("id", ids)
+
+    if (error) throw error
+
+    revalidatePath("/admin/payments")
+    revalidatePath("/admin/verify")
+    return { success: true, message: `${ids.length} data pembayaran berhasil dihapus.` }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

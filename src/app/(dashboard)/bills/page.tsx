@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
-import { formatCurrency, isPaymentOverdue } from "@/lib/utils"
+import { formatCurrency, isPaymentOverdue, getJenjangLabel, getJenjangColorLight, BILLING_COMPONENTS } from "@/lib/utils"
 import { CreditCard, CheckCircle, Clock, AlertCircle, Upload, Search, Copy, Check, QrCode, AlertTriangle, XCircle } from "lucide-react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
@@ -19,6 +19,8 @@ export default function BillsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [copied, setCopied] = useState(false)
   const [methods, setMethods] = useState<any[]>([])
+  const [studentJenjang, setStudentJenjang] = useState<string>('smp_mts')
+  const [billingRates, setBillingRates] = useState<Record<string, number>>({})
   const [settings, setSettings] = useState<any>({
     bank_name: "BSI",
     bank_account_number: "7123456789",
@@ -86,6 +88,31 @@ export default function BillsPage() {
         .single()
 
       if (studentData) {
+        // Get student's jenjang
+        const { data: fullStudent } = await supabase
+          .from("students")
+          .select("id, jenjang")
+          .eq("nisn", profile.nisn)
+          .single()
+
+        const jenjang = fullStudent?.jenjang || 'smp_mts'
+        setStudentJenjang(jenjang)
+
+        // Fetch billing rates for this jenjang
+        const { data: rateData } = await supabase
+          .from("system_settings")
+          .select("value")
+          .eq("key", `billing_rates_${jenjang}`)
+          .single()
+
+        if (rateData) {
+          try {
+            setBillingRates(JSON.parse(rateData.value))
+          } catch {
+            setBillingRates({})
+          }
+        }
+
         const { data: paymentData } = await supabase
           .from("payments")
           .select("*")
@@ -251,27 +278,21 @@ export default function BillsPage() {
               </div>
               
               <div className="w-full mt-4 pt-4 border-t border-slate-50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border", getJenjangColorLight(studentJenjang))}>
+                      {getJenjangLabel(studentJenjang)}
+                    </span>
+                  </div>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                          <p className="opacity-50 mb-1 scale-90 origin-left">Kos Makan</p>
-                          <p className="text-slate-600">Rp 100k</p>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                          <p className="opacity-50 mb-1 scale-90 origin-left">Sekolah Diniah</p>
-                          <p className="text-slate-600">Rp 50k</p>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                          <p className="opacity-50 mb-1 scale-90 origin-left">Sekolah Formal</p>
-                          <p className="text-slate-600">Rp 50k</p>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                          <p className="opacity-50 mb-1 scale-90 origin-left">Listrik & Kes</p>
-                          <p className="text-slate-600">Rp 25k</p>
-                      </div>
-                      <div className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                          <p className="opacity-50 mb-1 scale-90 origin-left">Uang Gedung</p>
-                          <p className="text-slate-600">Rp 25k</p>
-                      </div>
+                      {BILLING_COMPONENTS.map(comp => {
+                        const amount = billingRates[comp.key] || 0
+                        return (
+                          <div key={comp.key} className="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                              <p className="opacity-50 mb-1 scale-90 origin-left">{comp.label}</p>
+                              <p className="text-slate-600">{amount > 0 ? formatCurrency(amount) : '-'}</p>
+                          </div>
+                        )
+                      })}
                   </div>
               </div>
             </motion.div>

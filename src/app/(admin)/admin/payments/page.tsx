@@ -9,10 +9,13 @@ import {
   Search,
   Filter,
   Download,
-  Trash2
+  Trash2,
+  Loader2,
+  GraduationCap
 } from "lucide-react"
-import { motion } from "framer-motion"
-import { formatCurrency } from "@/lib/utils"
+import { motion, AnimatePresence } from "framer-motion"
+import { formatCurrency, cn, JENJANG_OPTIONS, getJenjangLabel, getJenjangColor } from "@/lib/utils"
+import { bulkDeletePayments } from "@/app/actions/payment-actions"
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +23,10 @@ export default function PaymentsPage() {
   const [allPayments, setAllPayments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<string>("all")
+  const [filterJenjang, setFilterJenjang] = useState<string>("all")
   const [searchQuery, setSearchQuery] = useState("")
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
   useEffect(() => {
     fetchAllPayments()
@@ -30,7 +36,7 @@ export default function PaymentsPage() {
     setLoading(true)
     const { data } = await supabase
       .from("payments")
-      .select("*, students(name, nisn, class_room)")
+      .select("*, students(name, nisn, class_room, jenjang)")
       .order("year", { ascending: false })
       .order("month", { ascending: false })
     
@@ -122,11 +128,47 @@ export default function PaymentsPage() {
 
   const filteredPayments = allPayments.filter(p => {
     const matchesStatus = filterStatus === "all" || p.status === filterStatus
+    const matchesJenjang = filterJenjang === "all" || (p.students?.jenjang || 'smp_mts') === filterJenjang
     const matchesSearch = searchQuery === "" || 
       p.students?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       p.students?.nisn?.includes(searchQuery)
-    return matchesStatus && matchesSearch
+    return matchesStatus && matchesSearch && matchesJenjang
   })
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredPayments.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredPayments.map(p => p.id))
+    }
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    )
+  }
+
+  const handleBulkDelete = async () => {
+    if (!selectedIds.length) return
+    if (!confirm(`Hapus ${selectedIds.length} data pembayaran terpilih? Tindakan ini tidak dapat dibatalkan.`)) return
+
+    setIsBulkDeleting(true)
+    try {
+      const response = await bulkDeletePayments(selectedIds)
+      if (response.success) {
+        alert(response.message)
+        setSelectedIds([])
+        fetchAllPayments()
+      } else {
+        alert("Gagal: " + response.error)
+      }
+    } catch (error: any) {
+      alert("Error: " + error.message)
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
 
   const getMonthName = (month: number) => {
     return new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, month - 1))
@@ -194,6 +236,18 @@ export default function PaymentsPage() {
             className="flex-1 bg-transparent border-none outline-none text-slate-200 text-sm py-1"
           />
         </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={filterJenjang}
+            onChange={(e) => setFilterJenjang(e.target.value)}
+            className="bg-slate-900 border border-slate-800 text-slate-300 rounded-xl px-3 py-2 text-xs font-medium outline-none appearance-none"
+          >
+            <option value="all">Semua Jenjang</option>
+            {JENJANG_OPTIONS.map(j => (
+              <option key={j.value} value={j.value}>{j.label}</option>
+            ))}
+          </select>
+        </div>
         
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           <button 
@@ -227,22 +281,31 @@ export default function PaymentsPage() {
       <div className="hidden md:block glass-card rounded-3xl overflow-hidden border border-slate-800/50">
         <div className="overflow-x-auto">
           <table className="w-full text-left">
-            <thead>
+            <thead className="sticky top-0 bg-slate-950/80 backdrop-blur-md z-10">
               <tr className="bg-slate-900/50 text-slate-400 text-xs uppercase tracking-wider">
+                <th className="px-6 py-4 font-semibold text-left w-10">
+                  <input 
+                    type="checkbox"
+                    checked={filteredPayments.length > 0 && selectedIds.length === filteredPayments.length}
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500/50"
+                  />
+                </th>
                 <th className="px-6 py-4 font-semibold">Santri</th>
                 <th className="px-6 py-4 font-semibold">Bulan/Tahun</th>
                 <th className="px-6 py-4 font-semibold">Nominal</th>
+                <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold text-center">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/50">
               {loading ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-slate-500">Memuat data...</td>
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">Memuat data...</td>
                 </tr>
               ) : filteredPayments.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-slate-500">
+                  <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
                     Tidak ada data pembayaran ditemukan.
                   </td>
                 </tr>
@@ -253,8 +316,19 @@ export default function PaymentsPage() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: idx * 0.02 }}
-                    className="hover:bg-slate-900/30 transition-colors"
+                    className={cn(
+                      "border-b border-slate-800/50 hover:bg-slate-900/30 transition-colors",
+                      selectedIds.includes(payment.id) && "bg-blue-500/5"
+                    )}
                   >
+                    <td className="px-6 py-4">
+                      <input 
+                        type="checkbox"
+                        checked={selectedIds.includes(payment.id)}
+                        onChange={() => toggleSelect(payment.id)}
+                        className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500/50"
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={cn(
@@ -269,7 +343,7 @@ export default function PaymentsPage() {
                         </div>
                         <div>
                           <p className="font-medium text-slate-200 text-sm">{payment.students?.name || 'N/A'}</p>
-                          <p className="text-[10px] text-slate-500">NISN: {payment.students?.nisn} • Kelas {payment.students?.class_room}</p>
+                          <p className="text-[10px] text-slate-500">NISN: {payment.students?.nisn} • Kelas {payment.students?.class_room} • <span className="capitalize">{getJenjangLabel(payment.students?.jenjang || 'smp_mts')}</span></p>
                         </div>
                       </div>
                     </td>
@@ -281,14 +355,14 @@ export default function PaymentsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className={cn(
-                        "text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-lg",
-                        payment.status === 'paid' ? "bg-green-500/10 text-green-400" :
-                        payment.status === 'pending' ? "bg-amber-500/10 text-amber-400" :
-                        "bg-red-500/10 text-red-400"
+                        "text-[10px] font-bold uppercase tracking-widest px-2.5 py-1.5 rounded-lg border",
+                        payment.status === 'paid' ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                        payment.status === 'pending' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                        "bg-red-500/10 text-red-400 border-red-500/20"
                       )}>
-                        {payment.status === 'paid' ? '✓ Lunas' : 
-                         payment.status === 'pending' ? '⏳ Verifikasi' : 
-                         '✗ Belum Bayar'}
+                        {payment.status === 'paid' ? 'LUNAS' : 
+                         payment.status === 'pending' ? 'VERIFIKASI' : 
+                         'BELUM BAYAR'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -329,10 +403,19 @@ export default function PaymentsPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.05 }}
-              className="glass-card rounded-2xl p-5 border border-slate-800/50 space-y-4"
+              className={cn(
+                "glass-card p-5 rounded-3xl border border-slate-800/50 relative overflow-hidden",
+                selectedIds.includes(payment.id) && "border-blue-500/40 bg-blue-500/5"
+              )}
             >
-              <div className="flex justify-between items-start">
+              <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox"
+                    checked={selectedIds.includes(payment.id)}
+                    onChange={() => toggleSelect(payment.id)}
+                    className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-blue-500/50"
+                  />
                   <div className={cn(
                     "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
                     payment.status === 'paid' ? "bg-green-500/10 text-green-500" :
@@ -375,10 +458,40 @@ export default function PaymentsPage() {
           ))
         )}
       </div>
+
+      {/* Bulk Action Bar */}
+      <AnimatePresence>
+        {selectedIds.length > 0 && (
+          <motion.div 
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-slate-900/90 backdrop-blur-xl border border-blue-500/30 px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-6 min-w-[320px]"
+          >
+            <div className="flex flex-col">
+              <span className="text-white font-bold text-sm">{selectedIds.length} Transaksi Terpilih</span>
+              <span className="text-slate-400 text-[10px] uppercase font-bold tracking-wider">Aksi Masal</span>
+            </div>
+            <div className="h-8 w-px bg-slate-800"></div>
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setSelectedIds([])}
+                className="text-slate-400 hover:text-white text-xs font-bold px-3 py-2 transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleBulkDelete}
+                disabled={isBulkDeleting}
+                className="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-lg shadow-red-900/20"
+              >
+                {isBulkDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Hapus ({selectedIds.length})
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
-}
-
-function cn(...inputs: any[]) {
-  return inputs.filter(Boolean).join(" ")
 }
