@@ -102,9 +102,7 @@ export default function VerificationPage() {
         student: payment.students,
         settings: {
           school_name: settings?.school_name || "Pondok Pesantren Miftahul Huda",
-          school_address: settings?.school_address || "",
-          school_logo_url: settings?.school_logo_url,
-          school_signature_url: settings?.school_signature_url
+          school_address: settings?.school_address || ""
         },
         components
       })
