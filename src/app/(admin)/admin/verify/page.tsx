@@ -15,6 +15,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import { formatCurrency, formatDate, cn } from "@/lib/utils"
 import { verifyPayment } from "@/app/actions/payment-actions"
+import { generateReceiptPDF } from "@/lib/receipt-generator"
+import { getBillingComponents } from "@/app/actions/bill-actions"
+import { Printer, Loader2 } from "lucide-react"
 
 export const dynamic = 'force-dynamic'
 
@@ -22,10 +25,32 @@ export default function VerificationPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedPayment, setSelectedPayment] = useState<any>(null)
+  const [settings, setSettings] = useState<any>(null)
+  const [components, setComponents] = useState<any[]>([])
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [verifiedPayment, setVerifiedPayment] = useState<any>(null)
 
   useEffect(() => {
     fetchPendingPayments()
+    fetchSettings()
+    fetchComponents()
   }, [])
+
+  const fetchSettings = async () => {
+    const { data } = await supabase.from("system_settings").select("*")
+    if (data) {
+      const settingsObj = data.reduce((acc: any, curr) => {
+        acc[curr.key] = curr.value
+        return acc
+      }, {})
+      setSettings(settingsObj)
+    }
+  }
+
+  const fetchComponents = async () => {
+    const comps = await getBillingComponents()
+    setComponents(comps)
+  }
 
   const fetchPendingPayments = async () => {
     setLoading(true)
@@ -38,16 +63,54 @@ export default function VerificationPage() {
     setLoading(false)
   }
   const handleVerify = async (id: string, status: 'paid' | 'rejected') => {
-    setLoading(true)
+    setIsVerifying(true)
     const res = await verifyPayment(id, status)
-
+    
     if (!res.success) {
       alert(res.error)
+      setIsVerifying(false)
     } else {
-      setSelectedPayment(null)
+      if (status === 'paid') {
+        setVerifiedPayment(selectedPayment)
+      } else {
+        setSelectedPayment(null)
+      }
       fetchPendingPayments()
+      setIsVerifying(false)
     }
-    setLoading(false)
+  }
+
+  const handlePrint = async (payment: any) => {
+    try {
+      // Get rates
+      const jenjang = payment.students?.jenjang || 'smp_mts'
+      const ratesKey = `billing_rates_${jenjang}`
+      let rates = {}
+      
+      const { data: ratesData } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", ratesKey)
+        .single()
+      
+      if (ratesData) {
+        try { rates = JSON.parse(ratesData.value) } catch {}
+      }
+
+      generateReceiptPDF({
+        payment: { ...payment, rates, verified_at: new Date().toISOString() },
+        student: payment.students,
+        settings: {
+          school_name: settings?.school_name || "Pondok Pesantren Miftahul Huda",
+          school_address: settings?.school_address || "",
+          school_logo_url: settings?.school_logo_url,
+          school_signature_url: settings?.school_signature_url
+        },
+        components
+      })
+    } catch (error) {
+      alert("Gagal mencetak kwitansi")
+    }
   }
 
   return (
@@ -178,76 +241,115 @@ export default function VerificationPage() {
               exit={{ scale: 0.9, opacity: 0 }}
               className="relative bg-slate-900 border border-slate-800 rounded-3xl p-8 w-full max-w-2xl shadow-2xl overflow-hidden"
             >
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-2xl font-bold font-outfit">Detail Pembayaran</h2>
-                  <p className="text-sm text-slate-400">Santri: {selectedPayment.students?.name}</p>
-                </div>
-                <button onClick={() => setSelectedPayment(null)} className="text-slate-500 hover:text-white">
-                  <XCircle size={24} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <div className="aspect-[3/4] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center relative group">
-                    {selectedPayment.proof_url ? (
-                      <img 
-                        src={selectedPayment.proof_url} 
-                        alt="Bukti Transfer" 
-                        className="w-full h-full object-contain"
-                      />
-                    ) : (
-                      <div className="text-center p-6 text-slate-600">
-                         <Search size={48} className="mx-auto mb-2 opacity-20" />
-                         <p className="text-sm">Gambar bukti tidak tersedia</p>
+              <AnimatePresence mode="wait">
+                {verifiedPayment ? (
+                  <motion.div 
+                    key="success"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center py-10"
+                  >
+                    <div className="h-20 w-20 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                      <CheckCircle size={48} />
+                    </div>
+                    <h3 className="text-2xl font-bold mb-2">Verifikasi Berhasil!</h3>
+                    <p className="text-slate-400 mb-8">Pembayaran untuk {verifiedPayment.students?.name} telah dikonfirmasi lunas.</p>
+                    
+                    <div className="flex flex-col gap-3 max-w-xs mx-auto">
+                      <button 
+                        onClick={() => handlePrint(verifiedPayment)}
+                        className="btn-primary flex items-center justify-center gap-2 py-4"
+                      >
+                        <Printer size={20} /> Cetak Kwitansi
+                      </button>
+                      <button 
+                        onClick={() => {
+                          setVerifiedPayment(null)
+                          setSelectedPayment(null)
+                        }}
+                        className="text-slate-500 hover:text-white font-bold"
+                      >
+                        Tutup
+                      </button>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div key="details">
+                    <div className="flex items-center justify-between mb-6">
+                      <div>
+                        <h2 className="text-2xl font-bold font-outfit">Detail Pembayaran</h2>
+                        <p className="text-sm text-slate-400">Santri: {selectedPayment.students?.name}</p>
                       </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                       <a href={selectedPayment.proof_url} target="_blank" className="bg-white text-black px-4 py-2 rounded-xl flex items-center gap-2 font-bold transform translate-y-4 group-hover:translate-y-0 transition-transform">
-                         <ExternalLink size={18} /> Perbesar
-                       </a>
+                      <button onClick={() => setSelectedPayment(null)} className="text-slate-500 hover:text-white">
+                        <XCircle size={24} />
+                      </button>
                     </div>
-                  </div>
-                </div>
 
-                <div className="flex flex-col justify-between">
-                  <div className="space-y-6">
-                    <div className="glass p-4 rounded-2xl border-l-4 border-blue-500">
-                      <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">Status Saat Ini</p>
-                      <div className="flex items-center gap-2 text-amber-400">
-                        <Clock size={16} /> <span className="font-bold">MENUNGGU VERIFIKASI</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-4">
+                        <div className="aspect-[3/4] bg-slate-950 rounded-2xl overflow-hidden border border-slate-800 flex items-center justify-center relative group">
+                          {selectedPayment.proof_url ? (
+                            <img 
+                              src={selectedPayment.proof_url} 
+                              alt="Bukti Transfer" 
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <div className="text-center p-6 text-slate-600">
+                               <Search size={48} className="mx-auto mb-2 opacity-20" />
+                               <p className="text-sm">Gambar bukti tidak tersedia</p>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                             <a href={selectedPayment.proof_url} target="_blank" className="bg-white text-black px-4 py-2 rounded-xl flex items-center gap-2 font-bold transform translate-y-4 group-hover:translate-y-0 transition-transform">
+                               <ExternalLink size={18} /> Perbesar
+                             </a>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col justify-between">
+                        <div className="space-y-6">
+                          <div className="glass p-4 rounded-2xl border-l-4 border-blue-500">
+                            <p className="text-xs text-slate-500 uppercase font-bold tracking-widest mb-1">Status Saat Ini</p>
+                            <div className="flex items-center gap-2 text-amber-400">
+                              <Clock size={16} /> <span className="font-bold">MENUNGGU VERIFIKASI</span>
+                            </div>
+                          </div>
+
+                          <div className="space-y-4">
+                             <div className="flex justify-between border-b border-slate-800 pb-2">
+                               <span className="text-slate-500">Bulan/Tahun</span>
+                               <span className="font-medium text-slate-200">{new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, selectedPayment.month - 1))} {selectedPayment.year}</span>
+                             </div>
+                             <div className="flex justify-between border-b border-slate-800 pb-2">
+                               <span className="text-slate-500">Total Tagihan</span>
+                               <span className="font-bold text-blue-400">{formatCurrency(selectedPayment.amount)}</span>
+                             </div>
+                          </div>
+                        </div>
+
+                        <div className="pt-8 space-y-3">
+                          <button 
+                            onClick={() => handleVerify(selectedPayment.id, 'paid')}
+                            disabled={isVerifying}
+                            className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                          >
+                            {isVerifying ? <Loader2 className="animate-spin" /> : <CheckCircle size={20} />} Konfirmasi Lunas
+                          </button>
+                          <button 
+                            onClick={() => handleVerify(selectedPayment.id, 'rejected')}
+                            disabled={isVerifying}
+                            className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-bold py-4 rounded-2xl border border-red-500/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                          >
+                            <XCircle size={20} /> Tolak Pembayaran
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="space-y-4">
-                       <div className="flex justify-between border-b border-slate-800 pb-2">
-                         <span className="text-slate-500">Bulan/Tahun</span>
-                         <span className="font-medium text-slate-200">{new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(new Date(2000, selectedPayment.month - 1))} {selectedPayment.year}</span>
-                       </div>
-                       <div className="flex justify-between border-b border-slate-800 pb-2">
-                         <span className="text-slate-500">Total Tagihan</span>
-                         <span className="font-bold text-blue-400">{formatCurrency(selectedPayment.amount)}</span>
-                       </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-8 space-y-3">
-                    <button 
-                      onClick={() => handleVerify(selectedPayment.id, 'paid')}
-                      className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-2xl shadow-lg shadow-green-900/20 flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <CheckCircle size={20} /> Konfirmasi Lunas
-                    </button>
-                    <button 
-                      onClick={() => handleVerify(selectedPayment.id, 'rejected')}
-                      className="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 font-bold py-4 rounded-2xl border border-red-500/20 flex items-center justify-center gap-2 transition-all active:scale-95"
-                    >
-                      <XCircle size={20} /> Tolak Pembayaran
-                    </button>
-                  </div>
-                </div>
-              </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           </div>
         )}

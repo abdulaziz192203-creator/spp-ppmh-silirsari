@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
-import { formatCurrency, isPaymentOverdue, getJenjangLabel, getJenjangColorLight, BILLING_COMPONENTS } from "@/lib/utils"
+import { formatCurrency, isPaymentOverdue, getJenjangLabel, getJenjangColorLight, BILLING_COMPONENTS, type BillingComponent } from "@/lib/utils"
+import { getBillingComponents } from "@/app/actions/bill-actions"
 import { CreditCard, CheckCircle, Clock, AlertCircle, Upload, Search, Copy, Check, QrCode, AlertTriangle, XCircle } from "lucide-react"
 import { motion } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import UploadProofModal from "@/components/layout/UploadProofModal"
+import { Printer, Loader2 } from "lucide-react"
+import { generateReceiptPDF } from "@/lib/receipt-generator"
 
 export const dynamic = 'force-dynamic'
 
@@ -21,12 +24,15 @@ export default function BillsPage() {
   const [methods, setMethods] = useState<any[]>([])
   const [studentJenjang, setStudentJenjang] = useState<string>('smp_mts')
   const [billingRates, setBillingRates] = useState<Record<string, number>>({})
+  const [components, setComponents] = useState<BillingComponent[]>([])
   const [settings, setSettings] = useState<any>({
     bank_name: "BSI",
     bank_account_number: "7123456789",
     bank_account_name: "PP Miftahul Huda",
     payment_deadline_day: "10"
   })
+  const [printingId, setPrintingId] = useState<string | null>(null)
+  const [student, setStudent] = useState<any>(null)
   const router = useRouter()
 
   const handleCopy = () => {
@@ -39,7 +45,13 @@ export default function BillsPage() {
     fetchPayments()
     fetchSettings()
     fetchMethods()
+    fetchComponents()
   }, [])
+
+  const fetchComponents = async () => {
+    const comps = await getBillingComponents()
+    setComponents(comps)
+  }
 
   const fetchMethods = async () => {
     const { data } = await supabase
@@ -91,10 +103,11 @@ export default function BillsPage() {
         // Get student's jenjang
         const { data: fullStudent } = await supabase
           .from("students")
-          .select("id, jenjang")
+          .select("*")
           .eq("nisn", profile.nisn)
           .single()
 
+        setStudent(fullStudent)
         const jenjang = fullStudent?.jenjang || 'smp_mts'
         setStudentJenjang(jenjang)
 
@@ -126,6 +139,27 @@ export default function BillsPage() {
       console.error("Error fetching payments:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePrintReceipt = async (payment: any) => {
+    setPrintingId(payment.id)
+    try {
+      generateReceiptPDF({
+        payment: { ...payment, rates: billingRates },
+        student,
+        settings: {
+          school_name: settings?.school_name || "Pondok Pesantren Miftahul Huda",
+          school_address: settings?.school_address || "",
+          school_logo_url: settings?.school_logo_url,
+          school_signature_url: settings?.school_signature_url
+        },
+        components
+      })
+    } catch (error) {
+      alert("Gagal mencetak kwitansi")
+    } finally {
+      setPrintingId(null)
     }
   }
 
@@ -269,6 +303,19 @@ export default function BillsPage() {
                          isPaymentOverdue(payment.month, payment.year, parseInt(settings.payment_deadline_day)) ? 'TERLAMBAT' : 'BELUM BAYAR'}
                         </span>
                     </div>
+                    {payment.status === 'paid' && (
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePrintReceipt(payment)
+                        }}
+                        disabled={printingId === payment.id}
+                        className="bg-blue-50 text-blue-600 p-3 rounded-2xl border border-blue-100 hover:bg-blue-100 transition-all md:ml-4"
+                        title="Cetak Kwitansi"
+                      >
+                        {printingId === payment.id ? <Loader2 size={20} className="animate-spin" /> : <Printer size={20} />}
+                      </button>
+                    )}
                     {(payment.status === 'unpaid' || payment.status === 'rejected') && (
                       <div className="bg-blue-600 text-white p-3 rounded-2xl shadow-lg shadow-blue-500/20 group-hover:scale-110 transition-transform md:ml-4">
                         <Upload size={20} />
@@ -284,7 +331,7 @@ export default function BillsPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-[10px] text-slate-400 font-bold uppercase tracking-tight">
-                      {BILLING_COMPONENTS.map(comp => {
+                      {components.map(comp => {
                         const amount = billingRates[comp.key] || 0
                         return (
                           <div key={comp.key} className="bg-slate-50 p-2 rounded-xl border border-slate-100">
@@ -293,6 +340,7 @@ export default function BillsPage() {
                           </div>
                         )
                       })}
+                      {components.length === 0 && <p className="col-span-full text-center text-slate-300 italic py-2">Detail rincian tidak tersedia</p>}
                   </div>
               </div>
             </motion.div>

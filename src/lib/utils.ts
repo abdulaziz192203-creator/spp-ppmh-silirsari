@@ -58,7 +58,12 @@ export const JENJANG_OPTIONS = [
 
 export type JenjangType = typeof JENJANG_OPTIONS[number]['value']
 
-export const BILLING_COMPONENTS = [
+export type BillingComponent = {
+  key: string
+  label: string
+}
+
+export const BILLING_COMPONENTS: readonly BillingComponent[] = [
   { key: 'kos_makan', label: 'Kos Makan' },
   { key: 'sekolah_diniah', label: 'Sekolah Diniah' },
   { key: 'sekolah_formal', label: 'Sekolah Formal' },

@@ -7,7 +7,7 @@ Sistem informasi pembayaran bulanan santri berbasis web (Next.js) dan backend mo
 - **Modern UI**: Desain premium dengan Glassmorphism dan Dark Mode.
 - **Mobile Friendly**: Responsif dan mendukung PWA (Installable di Android/iOS).
 - **Verifikasi Online**: Upload bukti transfer dan verifikasi oleh Admin/Bendahara.
-- **Statistik Realtime**: Dashboard statistik untuk pimpinan dan admin.
+- **Statistik Realtime**: Dashboard statistik untuk admin memantau keuangan.
 
 ## Teknologi
 - **Frontend**: Next.js 14+ (React), Tailwind CSS, Framer Motion.

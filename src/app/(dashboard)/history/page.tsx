@@ -6,14 +6,39 @@ import { formatCurrency, formatDate } from "@/lib/utils"
 import { History as HistoryIcon, CheckCircle, Clock, Search, CreditCard } from "lucide-react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { Printer, Loader2 } from "lucide-react"
+import { generateReceiptPDF } from "@/lib/receipt-generator"
+import { getBillingComponents } from "@/app/actions/bill-actions"
 
 export default function HistoryPage() {
   const [payments, setPayments] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [settings, setSettings] = useState<any>(null)
+  const [components, setComponents] = useState<any[]>([])
+  const [printingId, setPrintingId] = useState<string | null>(null)
+  const [student, setStudent] = useState<any>(null)
 
   useEffect(() => {
     fetchHistory()
+    fetchSettings()
+    fetchComponents()
   }, [])
+
+  const fetchSettings = async () => {
+    const { data } = await supabase.from("system_settings").select("*")
+    if (data) {
+      const settingsObj = data.reduce((acc: any, curr) => {
+        acc[curr.key] = curr.value
+        return acc
+      }, {})
+      setSettings(settingsObj)
+    }
+  }
+
+  const fetchComponents = async () => {
+    const comps = await getBillingComponents()
+    setComponents(comps)
+  }
 
   const fetchHistory = async () => {
     try {
@@ -38,6 +63,15 @@ export default function HistoryPage() {
         .single()
 
       if (studentData) {
+        // Get full student data for levels
+        const { data: fullStudent } = await supabase
+          .from("students")
+          .select("*")
+          .eq("id", studentData.id)
+          .single()
+        
+        setStudent(fullStudent)
+
         // Get non-unpaid payments (paid and pending)
         const { data: paymentData } = await supabase
           .from("payments")
@@ -52,6 +86,43 @@ export default function HistoryPage() {
       console.error("Error fetching history:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handlePrintReceipt = async (payment: any) => {
+    setPrintingId(payment.id)
+    try {
+      // Get rates for this jenjang
+      const jenjang = student?.jenjang || 'smp_mts'
+      const ratesKey = `billing_rates_${jenjang}`
+      let rates = {}
+      
+      const { data: ratesData } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", ratesKey)
+        .single()
+      
+      if (ratesData) {
+        try { rates = JSON.parse(ratesData.value) } catch {}
+      }
+
+      generateReceiptPDF({
+        payment: { ...payment, rates },
+        student,
+        settings: {
+          school_name: settings?.school_name || "Pondok Pesantren Miftahul Huda",
+          school_address: settings?.school_address || "",
+          school_logo_url: settings?.school_logo_url,
+          school_signature_url: settings?.school_signature_url
+        },
+        components
+      })
+    } catch (error) {
+      console.error("Print error:", error)
+      alert("Gagal mencetak kwitansi")
+    } finally {
+      setPrintingId(null)
     }
   }
 
@@ -121,9 +192,21 @@ export default function HistoryPage() {
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                <div className="flex items-center gap-2 text-slate-400">
-                  <CreditCard size={14} />
-                  <span className="text-[10px] font-bold uppercase tracking-tight">Nominal</span>
+                <div className="flex items-center gap-3">
+                   <div className="flex items-center gap-2 text-slate-400">
+                    <CreditCard size={14} />
+                    <span className="text-[10px] font-bold uppercase tracking-tight">Nominal</span>
+                  </div>
+                  {payment.status === 'paid' && (
+                    <button 
+                      onClick={() => handlePrintReceipt(payment)}
+                      disabled={printingId === payment.id}
+                      className="flex items-center gap-2 bg-blue-50 text-blue-600 px-3 py-1.5 rounded-xl text-[10px] font-bold border border-blue-100 hover:bg-blue-100 transition-all"
+                    >
+                      {printingId === payment.id ? <Loader2 size={12} className="animate-spin" /> : <Printer size={12} />}
+                      Cetak Kwitansi
+                    </button>
+                  )}
                 </div>
                 <span className="font-bold text-blue-600">{formatCurrency(payment.amount)}</span>
               </div>

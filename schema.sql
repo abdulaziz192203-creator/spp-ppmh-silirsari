@@ -135,3 +135,23 @@ INSERT INTO system_settings (key, value) VALUES
 ON CONFLICT (key) DO NOTHING;
 
 -- TRIGGER THE FUNCTION... (rest of the file)
+
+-- ================================================
+-- PIMPINAN (Leader) RLS Policies - READ ONLY
+-- ================================================
+
+-- Pimpinan can view all students
+CREATE POLICY "Pimpinan can view all students" ON students
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'pimpinan')
+  );
+
+-- Pimpinan can view all payments
+CREATE POLICY "Pimpinan can view all payments" ON payments
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'pimpinan')
+  );
+
+-- NOTE: To add a pimpinan user, run in Supabase:
+-- 1. Create user in Auth with email/password
+-- 2. Update their profile: UPDATE profiles SET role = 'pimpinan', full_name = 'Nama Pimpinan' WHERE id = 'USER_UUID';

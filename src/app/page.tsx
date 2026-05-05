@@ -3,12 +3,12 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
-import { LogIn, User, ShieldCheck, Loader2 } from "lucide-react"
+import { LogIn, User, ShieldCheck, Loader2, Crown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
 
 export default function LoginPage() {
-  const [role, setRole] = useState<"parent" | "admin">("parent")
+  const [role, setRole] = useState<"parent" | "admin" | "pimpinan">("parent")
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -40,10 +40,20 @@ export default function LoginPage() {
 
       if (profile.role !== role) {
         await supabase.auth.signOut()
-        throw new Error(`Anda bukan ${role === "admin" ? "Admin" : "Orang Tua"}`)
+        const roleLabels: Record<string, string> = {
+          admin: "Admin",
+          parent: "Wali Santri",
+          pimpinan: "Pemimpin"
+        }
+        throw new Error(`Anda bukan ${roleLabels[role] || role}`)
       }
 
-      router.push(role === "admin" ? "/admin" : "/dashboard")
+      const redirectMap: Record<string, string> = {
+        admin: "/admin",
+        parent: "/dashboard",
+        pimpinan: "/pimpinan"
+      }
+      router.push(redirectMap[role] || "/")
     } catch (err: any) {
       setError(err.message || "Gagal login. Periksa kembali kredensial Anda.")
     } finally {
@@ -51,11 +61,40 @@ export default function LoginPage() {
     }
   }
 
+  const roleConfig = {
+    parent: {
+      buttonColor: "bg-blue-600 text-white shadow-lg shadow-blue-500/20",
+      submitColor: "bg-blue-600 text-white shadow-blue-500/30 hover:bg-blue-700",
+      label: "NISN Santri",
+      placeholder: "Masukkan NISN",
+      inputType: "text" as const,
+    },
+    admin: {
+      buttonColor: "bg-slate-800 text-white shadow-lg",
+      submitColor: "bg-slate-800 text-white shadow-slate-500/30 hover:bg-slate-900",
+      label: "Email Admin",
+      placeholder: "admin@example.com",
+      inputType: "email" as const,
+    },
+    pimpinan: {
+      buttonColor: "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-lg shadow-amber-500/20",
+      submitColor: "bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-amber-500/30 hover:from-amber-400 hover:to-orange-500",
+      label: "Email Pemimpin",
+      placeholder: "pimpinan@example.com",
+      inputType: "email" as const,
+    }
+  }
+
+  const currentConfig = roleConfig[role]
+
   return (
     <div className="flex min-h-screen items-center justify-center p-6 bg-slate-50 relative overflow-hidden">
       {/* Background Decorative Blobs */}
       <div className="absolute top-0 right-0 w-96 h-96 bg-blue-100 rounded-full -mr-32 -mt-32 blur-3xl opacity-50"></div>
       <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-100 rounded-full -ml-32 -mb-32 blur-3xl opacity-50"></div>
+      {role === "pimpinan" && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-amber-100 rounded-full blur-3xl opacity-30 transition-opacity duration-700"></div>
+      )}
 
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
@@ -63,47 +102,67 @@ export default function LoginPage() {
         className="w-full max-w-md relative z-10"
       >
         <div className="bg-white rounded-[40px] p-10 shadow-[0_20px_50px_rgba(0,0,0,0.05)] border border-slate-100 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+          <div className={cn(
+            "absolute top-0 left-0 w-full h-2 transition-all duration-500",
+            role === "parent" ? "bg-gradient-to-r from-blue-600 to-indigo-600" :
+            role === "admin" ? "bg-gradient-to-r from-slate-700 to-slate-900" :
+            "bg-gradient-to-r from-amber-400 via-orange-500 to-amber-600"
+          )}></div>
           
           <div className="text-center mb-10">
-            <div className="h-16 w-16 bg-blue-600 rounded-3xl mx-auto mb-4 flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
-               <LogIn size={32} />
+            <div className={cn(
+              "h-16 w-16 rounded-3xl mx-auto mb-4 flex items-center justify-center text-white shadow-xl transition-all duration-500",
+              role === "parent" ? "bg-blue-600 shadow-blue-500/20" :
+              role === "admin" ? "bg-slate-800 shadow-slate-500/20" :
+              "bg-gradient-to-br from-amber-400 to-orange-500 shadow-amber-500/20"
+            )}>
+               {role === "pimpinan" ? <Crown size={32} /> : <LogIn size={32} />}
             </div>
             <h1 className="text-3xl font-bold font-outfit text-slate-800 tracking-tight">SPP PPMH</h1>
             <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Miftahul Huda Silir Sari</p>
           </div>
 
+          {/* Role Switcher - 3 tabs */}
           <div className="flex bg-slate-50 p-1.5 rounded-[20px] mb-8 border border-slate-100">
             <button
               onClick={() => setRole("parent")}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-[15px] transition-all text-xs font-black uppercase tracking-wider",
-                role === "parent" ? "bg-blue-600 text-white shadow-lg shadow-blue-500/20" : "text-slate-400 hover:text-slate-600"
+                "flex-1 flex items-center justify-center gap-1.5 py-3 rounded-[15px] transition-all text-[10px] font-black uppercase tracking-wider",
+                role === "parent" ? roleConfig.parent.buttonColor : "text-slate-400 hover:text-slate-600"
               )}
             >
-              <User size={16} /> Wali Santri
+              <User size={14} /> Wali
+            </button>
+            <button
+              onClick={() => setRole("pimpinan")}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-1.5 py-3 rounded-[15px] transition-all text-[10px] font-black uppercase tracking-wider",
+                role === "pimpinan" ? roleConfig.pimpinan.buttonColor : "text-slate-400 hover:text-slate-600"
+              )}
+            >
+              <Crown size={14} /> Pimpinan
             </button>
             <button
               onClick={() => setRole("admin")}
               className={cn(
-                "flex-1 flex items-center justify-center gap-2 py-3 rounded-[15px] transition-all text-xs font-black uppercase tracking-wider",
-                role === "admin" ? "bg-slate-800 text-white shadow-lg" : "text-slate-400 hover:text-slate-600"
+                "flex-1 flex items-center justify-center gap-1.5 py-3 rounded-[15px] transition-all text-[10px] font-black uppercase tracking-wider",
+                role === "admin" ? roleConfig.admin.buttonColor : "text-slate-400 hover:text-slate-600"
               )}
             >
-              <ShieldCheck size={16} /> Admin
+              <ShieldCheck size={14} /> Admin
             </button>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
             <div>
               <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 ml-1">
-                {role === "parent" ? "NISN Santri" : "Email Admin"}
+                {currentConfig.label}
               </label>
               <input
-                type={role === "parent" ? "text" : "email"}
+                type={currentConfig.inputType}
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder={role === "parent" ? "Masukkan NISN" : "admin@example.com"}
+                placeholder={currentConfig.placeholder}
                 className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-slate-800 placeholder-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all font-bold text-sm"
                 required
               />
@@ -140,9 +199,7 @@ export default function LoginPage() {
               disabled={loading}
               className={cn(
                 "w-full flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs py-5 rounded-[24px] transition-all duration-300 shadow-xl active:scale-[0.98]",
-                role === "parent" 
-                  ? "bg-blue-600 text-white shadow-blue-500/30 hover:bg-blue-700" 
-                  : "bg-slate-800 text-white shadow-slate-500/30 hover:bg-slate-900",
+                currentConfig.submitColor,
                 loading && "opacity-70 cursor-not-allowed grayscale"
               )}
             >
@@ -150,7 +207,7 @@ export default function LoginPage() {
                 <Loader2 className="animate-spin" size={20} />
               ) : (
                 <>
-                  <LogIn size={20} />
+                  {role === "pimpinan" ? <Crown size={20} /> : <LogIn size={20} />}
                   Masuk Ke Sistem
                 </>
               )}

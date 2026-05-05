@@ -11,11 +11,14 @@ import {
   CheckCircle2,
   Loader2,
   Save,
-  GraduationCap
+  GraduationCap,
+  Settings2,
+  Trash2,
+  Settings
 } from "lucide-react"
-import { motion } from "framer-motion"
-import { formatCurrency, cn, JENJANG_OPTIONS, BILLING_COMPONENTS, getJenjangLabel } from "@/lib/utils"
-import { generateBulkBills, saveBillingRates, getBillingRates } from "@/app/actions/bill-actions"
+import { motion, AnimatePresence } from "framer-motion"
+import { formatCurrency, cn, JENJANG_OPTIONS, BILLING_COMPONENTS, getJenjangLabel, type BillingComponent } from "@/lib/utils"
+import { generateBulkBills, saveBillingRates, getBillingRates, getBillingComponents, saveBillingComponents } from "@/app/actions/bill-actions"
 
 export const dynamic = 'force-dynamic'
 
@@ -39,6 +42,10 @@ export default function BillsPage() {
   const [savingDeadline, setSavingDeadline] = useState(false)
   const [activeJenjang, setActiveJenjang] = useState<string>(JENJANG_OPTIONS[0].value)
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({})
+  const [components, setComponents] = useState<BillingComponent[]>([])
+  const [isManagingComponents, setIsManagingComponents] = useState(false)
+  const [newCompLabel, setNewCompLabel] = useState("")
+  const [savingComponents, setSavingComponents] = useState(false)
   
   // Rates per jenjang
   const [rates, setRates] = useState<BillingRatesMap>(() => {
@@ -57,7 +64,13 @@ export default function BillsPage() {
     fetchDeadline()
     fetchRates()
     fetchStudentCounts()
+    fetchComponents()
   }, [])
+
+  const fetchComponents = async () => {
+    const comps = await getBillingComponents()
+    setComponents(comps)
+  }
 
   const fetchStudentCounts = async () => {
     const { data } = await supabase.from("students").select("jenjang")
@@ -133,6 +146,39 @@ export default function BillsPage() {
     }
   }
 
+  const handleSaveComponents = async () => {
+    if (components.length === 0) return alert("Minimal harus ada satu komponen tagihan.")
+    setSavingComponents(true)
+    try {
+      const response = await saveBillingComponents(components)
+      if (response.success) {
+        alert("Komponen tagihan berhasil diperbarui!")
+        setIsManagingComponents(false)
+        fetchRates() // Refresh rates to include new components
+      } else {
+        alert("Gagal: " + response.error)
+      }
+    } catch (error: any) {
+      alert("Gagal menyimpan komponen: " + error.message)
+    } finally {
+      setSavingComponents(false)
+    }
+  }
+
+  const handleAddComponent = () => {
+    if (!newCompLabel.trim()) return
+    const key = newCompLabel.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '')
+    if (components.find(c => c.key === key)) return alert("Komponen dengan nama serupa sudah ada.")
+    
+    setComponents([...components, { key, label: newCompLabel }])
+    setNewCompLabel("")
+  }
+
+  const handleDeleteComponent = (key: string) => {
+    if (!confirm("Hapus komponen ini? Nilai tarif yang sudah diset untuk komponen ini akan hilang pada penyimpanan berikutnya.")) return
+    setComponents(components.filter(c => c.key !== key))
+  }
+
   const handleUpdateRate = (jenjang: string, component: string, value: number) => {
     setRates(prev => ({
       ...prev,
@@ -187,15 +233,100 @@ export default function BillsPage() {
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <GraduationCap className="text-blue-500" /> Tarif Per Jenjang
               </h3>
-              <button
-                onClick={handleSaveRates}
-                disabled={savingRates}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-lg shadow-blue-900/20"
-              >
-                {savingRates ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                Simpan Tarif
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsManagingComponents(!isManagingComponents)}
+                  className={cn(
+                    "p-2.5 rounded-xl transition-all border",
+                    isManagingComponents 
+                      ? "bg-amber-500/10 text-amber-500 border-amber-500/30" 
+                      : "bg-slate-900/50 text-slate-400 border-slate-800 hover:text-slate-200"
+                  )}
+                  title="Pengaturan Komponen Tagihan"
+                >
+                  <Settings2 size={18} />
+                </button>
+                <button
+                  onClick={handleSaveRates}
+                  disabled={savingRates}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 shadow-lg shadow-blue-900/20"
+                >
+                  {savingRates ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                  Simpan Tarif
+                </button>
+              </div>
             </div>
+
+            <AnimatePresence>
+              {isManagingComponents && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden mb-8"
+                >
+                  <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h4 className="font-bold text-slate-200 flex items-center gap-2 text-sm">
+                        <Settings size={16} className="text-amber-500" /> Pengaturan Komponen Tagihan
+                      </h4>
+                      <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest">Atur Kategori Biaya</p>
+                    </div>
+
+                    <div className="space-y-3 mb-6">
+                      {components.map((comp) => (
+                        <div key={comp.key} className="flex items-center justify-between bg-slate-950/50 border border-slate-800/50 p-3 rounded-xl group">
+                          <span className="text-sm text-slate-300 font-medium">{comp.label}</span>
+                          <button 
+                            onClick={() => handleDeleteComponent(comp.key)}
+                            className="text-slate-600 hover:text-red-500 p-1.5 transition-colors"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <input 
+                        type="text" 
+                        placeholder="Nama komponen baru (misal: Uang Iuran)"
+                        value={newCompLabel}
+                        onChange={(e) => setNewCompLabel(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAddComponent()}
+                        className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <button 
+                        onClick={handleAddComponent}
+                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
+                      >
+                        Tambah
+                      </button>
+                    </div>
+
+                    <div className="mt-6 pt-6 border-t border-slate-800 flex justify-end gap-3">
+                      <button 
+                        onClick={() => {
+                          setIsManagingComponents(false)
+                          fetchComponents() // Reset to DB state
+                        }}
+                        className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white transition-colors"
+                      >
+                        Batal
+                      </button>
+                      <button 
+                        onClick={handleSaveComponents}
+                        disabled={savingComponents}
+                        className="bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white px-6 py-2 rounded-xl text-xs font-bold transition-all border border-blue-500/30 flex items-center gap-2"
+                      >
+                        {savingComponents ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        Simpan Komponen
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
             {/* Jenjang Tabs */}
             <div className="flex gap-2 overflow-x-auto pb-2 mb-6 scrollbar-hide">
@@ -244,7 +375,7 @@ export default function BillsPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {BILLING_COMPONENTS.map((comp) => (
+                {components.map((comp) => (
                   <div key={comp.key}>
                     <label className="block text-xs text-slate-400 mb-1">{comp.label}</label>
                     <div className="relative">
@@ -258,6 +389,11 @@ export default function BillsPage() {
                     </div>
                   </div>
                 ))}
+                {components.length === 0 && (
+                  <p className="col-span-2 text-center py-8 text-slate-500 text-sm italic">
+                    Belum ada komponen tagihan. Klik ikon pengaturan di atas untuk menambahkan.
+                  </p>
+                )}
               </div>
 
               <div className="flex justify-between items-center bg-blue-500/10 p-4 rounded-xl border border-blue-500/20 mt-4">

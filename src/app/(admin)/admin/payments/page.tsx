@@ -16,6 +16,9 @@ import {
 import { motion, AnimatePresence } from "framer-motion"
 import { formatCurrency, cn, JENJANG_OPTIONS, getJenjangLabel, getJenjangColor } from "@/lib/utils"
 import { bulkDeletePayments } from "@/app/actions/payment-actions"
+import { generateReceiptPDF } from "@/lib/receipt-generator"
+import { getBillingComponents } from "@/app/actions/bill-actions"
+import { Printer } from "lucide-react"
 
 export const dynamic = 'force-dynamic'
 
@@ -27,10 +30,31 @@ export default function PaymentsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedIds, setSelectedIds] = useState<string[]>([])
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [settings, setSettings] = useState<any>(null)
+  const [components, setComponents] = useState<any[]>([])
+  const [printingId, setPrintingId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchAllPayments()
+    fetchSettings()
+    fetchComponents()
   }, [])
+
+  const fetchSettings = async () => {
+    const { data } = await supabase.from("system_settings").select("*")
+    if (data) {
+      const settingsObj = data.reduce((acc: any, curr) => {
+        acc[curr.key] = curr.value
+        return acc
+      }, {})
+      setSettings(settingsObj)
+    }
+  }
+
+  const fetchComponents = async () => {
+    const comps = await getBillingComponents()
+    setComponents(comps)
+  }
 
   const fetchAllPayments = async () => {
     setLoading(true)
@@ -167,6 +191,43 @@ export default function PaymentsPage() {
       alert("Error: " + error.message)
     } finally {
       setIsBulkDeleting(false)
+    }
+  }
+
+  const handlePrintReceipt = async (payment: any) => {
+    setPrintingId(payment.id)
+    try {
+      // Get rates for this jenjang from settings if not directly in payment
+      const jenjang = payment.students?.jenjang || 'smp_mts'
+      const ratesKey = `billing_rates_${jenjang}`
+      let rates = {}
+      
+      const { data: ratesData } = await supabase
+        .from("system_settings")
+        .select("value")
+        .eq("key", ratesKey)
+        .single()
+      
+      if (ratesData) {
+        try { rates = JSON.parse(ratesData.value) } catch {}
+      }
+
+      generateReceiptPDF({
+        payment: { ...payment, rates },
+        student: payment.students,
+        settings: {
+          school_name: settings?.school_name || "Pondok Pesantren Miftahul Huda",
+          school_address: settings?.school_address || "",
+          school_logo_url: settings?.school_logo_url,
+          school_signature_url: settings?.school_signature_url
+        },
+        components
+      })
+    } catch (error) {
+      console.error("Print error:", error)
+      alert("Gagal mencetak kwitansi")
+    } finally {
+      setPrintingId(null)
     }
   }
 
@@ -366,13 +427,25 @@ export default function PaymentsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <button 
-                        onClick={() => handleDeleteOne(payment.id, payment.students?.name)}
-                        className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-                        title="Hapus Pembayaran"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      <div className="flex justify-center gap-2">
+                        {payment.status === 'paid' && (
+                          <button 
+                            onClick={() => handlePrintReceipt(payment)}
+                            disabled={printingId === payment.id}
+                            className="p-2 text-blue-500 hover:text-blue-400 hover:bg-blue-400/10 rounded-lg transition-all"
+                            title="Cetak Kwitansi"
+                          >
+                            {printingId === payment.id ? <Loader2 size={16} className="animate-spin" /> : <Printer size={16} />}
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => handleDeleteOne(payment.id, payment.students?.name)}
+                          className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
+                          title="Hapus Pembayaran"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </motion.tr>
                 ))
@@ -440,8 +513,19 @@ export default function PaymentsPage() {
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <div className="text-blue-400 font-bold text-sm">
-                  {formatCurrency(payment.amount)}
+                <div className="flex items-center gap-3">
+                  {payment.status === 'paid' && (
+                    <button 
+                      onClick={() => handlePrintReceipt(payment)}
+                      disabled={printingId === payment.id}
+                      className="p-2.5 bg-blue-500/10 text-blue-400 rounded-xl"
+                    >
+                      {printingId === payment.id ? <Loader2 size={14} className="animate-spin" /> : <Printer size={16} />}
+                    </button>
+                  )}
+                  <div className="text-blue-400 font-bold text-sm">
+                    {formatCurrency(payment.amount)}
+                  </div>
                 </div>
                 <span className={cn(
                   "text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border",

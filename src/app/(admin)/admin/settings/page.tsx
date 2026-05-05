@@ -13,9 +13,13 @@ import {
   CheckCircle2,
   AlertCircle,
   QrCode,
-  ChevronRight
+  ChevronRight,
+  KeyRound,
+  Eye,
+  Upload,
+  ImageIcon
 } from "lucide-react"
-import { motion } from "framer-motion"
+import { motion, AnimatePresence } from "framer-motion"
 import { useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 
@@ -36,6 +40,31 @@ export default function SettingsPage() {
     full_name: "",
     nisn: ""
   })
+
+  // Password change
+  const [showPasswordForm, setShowPasswordForm] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [passwordMsg, setPasswordMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [showNewPw, setShowNewPw] = useState(false)
+  const [showConfirmPw, setShowConfirmPw] = useState(false)
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newPassword.length < 6) { setPasswordMsg({ type: 'error', text: 'Password minimal 6 karakter' }); return }
+    if (newPassword !== confirmPassword) { setPasswordMsg({ type: 'error', text: 'Konfirmasi password tidak cocok' }); return }
+    setSavingPassword(true); setPasswordMsg(null)
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword })
+      if (error) throw error
+      setPasswordMsg({ type: 'success', text: 'Password berhasil diubah!' })
+      setNewPassword(""); setConfirmPassword(""); setShowPasswordForm(false)
+      setTimeout(() => setPasswordMsg(null), 3000)
+    } catch (err: any) {
+      setPasswordMsg({ type: 'error', text: err.message || 'Gagal mengubah password' })
+    } finally { setSavingPassword(false) }
+  }
 
   useEffect(() => {
     fetchData()
@@ -85,6 +114,7 @@ export default function SettingsPage() {
     } finally {
       setLoading(false)
     }
+
   }
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -136,14 +166,25 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-8 pb-12">
-      <div>
-        <div className="flex items-center gap-3 mb-2">
-          <div className="h-10 w-10 bg-blue-600/10 text-blue-400 rounded-xl flex items-center justify-center">
-            <SettingsIcon size={24} />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <div className="flex items-center gap-3 mb-2">
+            <div className="h-10 w-10 bg-blue-600/10 text-blue-400 rounded-xl flex items-center justify-center">
+              <SettingsIcon size={24} />
+            </div>
+            <h1 className="text-3xl font-bold font-outfit">Pengaturan Sistem</h1>
           </div>
-          <h1 className="text-3xl font-bold font-outfit">Pengaturan Sistem</h1>
+          <p className="text-slate-400">Kelola identitas instansi, periode akademik, dan parameter pembayaran.</p>
         </div>
-        <p className="text-slate-400">Kelola identitas instansi, periode akademik, dan parameter pembayaran.</p>
+        <button 
+          type="submit"
+          form="settings-form"
+          disabled={saving}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-xl shadow-blue-900/20 disabled:opacity-50 active:scale-95"
+        >
+          {saving ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />}
+          Simpan Semua Perubahan
+        </button>
       </div>
 
       <form id="settings-form" onSubmit={handleSaveSettings} className="space-y-6">
@@ -193,6 +234,7 @@ export default function SettingsPage() {
             </div>
           </div>
 
+
           {/* Section: Akademik & Deadline */}
           <div className="glass-card rounded-3xl p-6 border border-slate-800/50 space-y-6">
             <div className="flex items-center gap-3 border-b border-slate-800 pb-4">
@@ -235,19 +277,9 @@ export default function SettingsPage() {
               </div>
             </div>
           </div>
+
         </div>
 
-        {/* Submit Button at Bottom */}
-        <div className="flex justify-end pt-6">
-          <button 
-            type="submit"
-            disabled={saving}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-10 py-4 rounded-2xl font-bold flex items-center gap-2 transition-all shadow-xl shadow-blue-900/20 disabled:opacity-50 active:scale-95"
-          >
-            {saving ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
-            Simpan Semua Perubahan
-          </button>
-        </div>
       </form>
 
       {/* Section: Kelola Metode Pembayaran (Full Width Card) - Moved outside form */}

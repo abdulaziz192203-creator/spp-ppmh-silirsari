@@ -2,7 +2,7 @@
 
 import { supabaseAdmin } from "@/lib/supabase-admin"
 import { revalidatePath } from "next/cache"
-import { JENJANG_OPTIONS, BILLING_COMPONENTS } from "@/lib/utils"
+import { JENJANG_OPTIONS, BILLING_COMPONENTS, type BillingComponent } from "@/lib/utils"
 
 type BillingRatesMap = Record<string, Record<string, number>>
 
@@ -28,8 +28,45 @@ export async function saveBillingRates(rates: BillingRatesMap) {
   }
 }
 
+export async function getBillingComponents(): Promise<BillingComponent[]> {
+  const { data } = await supabaseAdmin
+    .from("system_settings")
+    .select("value")
+    .eq("key", "billing_components")
+    .single()
+
+  if (data) {
+    try {
+      return JSON.parse(data.value)
+    } catch {
+      return [...BILLING_COMPONENTS]
+    }
+  }
+  return [...BILLING_COMPONENTS]
+}
+
+export async function saveBillingComponents(components: BillingComponent[]) {
+  try {
+    const { error } = await supabaseAdmin
+      .from("system_settings")
+      .upsert({
+        key: "billing_components",
+        value: JSON.stringify(components),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'key' })
+
+    if (error) throw error
+    revalidatePath("/admin/bills")
+    revalidatePath("/dashboard/bills")
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
 export async function getBillingRates(): Promise<BillingRatesMap> {
   const rates: BillingRatesMap = {}
+  const components = await getBillingComponents()
 
   for (const jenjang of JENJANG_OPTIONS) {
     const { data } = await supabaseAdmin
@@ -55,6 +92,13 @@ export async function getBillingRates(): Promise<BillingRatesMap> {
       }
       rates[jenjang.value] = defaults[jenjang.value] || {}
     }
+
+    // Ensure all current components exist in the rates (default to 0 if missing)
+    components.forEach(comp => {
+      if (rates[jenjang.value][comp.key] === undefined) {
+        rates[jenjang.value][comp.key] = 0
+      }
+    })
   }
 
   return rates
