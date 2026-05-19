@@ -38,6 +38,11 @@ ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE students ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments ENABLE ROW LEVEL SECURITY;
 
+-- Grant API access to public tables
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.profiles TO anon, authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.students TO anon, authenticated, service_role;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.payments TO anon, authenticated, service_role;
+
 -- Profiles Policies
 CREATE POLICY "Public profiles are viewable by everyone." ON profiles
   FOR SELECT USING (true);
@@ -104,7 +109,11 @@ BEGIN
   );
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- Revoke execute from public to secure the trigger function
+REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM public, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO service_role;
 
 
 -- Create system_settings table
@@ -117,6 +126,9 @@ CREATE TABLE system_settings (
 
 -- System Settings Policies
 ALTER TABLE system_settings ENABLE ROW LEVEL SECURITY;
+
+-- Grant API access to system settings
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.system_settings TO anon, authenticated, service_role;
 
 CREATE POLICY "Allow public read on settings" ON system_settings
   FOR SELECT USING (true);
