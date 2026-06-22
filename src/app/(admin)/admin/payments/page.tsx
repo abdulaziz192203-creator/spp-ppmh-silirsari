@@ -19,6 +19,7 @@ import { bulkDeletePayments } from "@/app/actions/payment-actions"
 import { generateReceiptPDF } from "@/lib/receipt-generator"
 import { getBillingComponents } from "@/app/actions/bill-actions"
 import { Printer } from "lucide-react"
+import { useToast } from "@/components/ui/Toast"
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,7 @@ export default function PaymentsPage() {
   const [settings, setSettings] = useState<any>(null)
   const [components, setComponents] = useState<any[]>([])
   const [printingId, setPrintingId] = useState<string | null>(null)
+  const { success, error: showError, info } = useToast()
 
   useEffect(() => {
     fetchAllPayments()
@@ -74,7 +76,7 @@ export default function PaymentsPage() {
       : allPayments
 
     if (dataToExport.length === 0) {
-      alert("Tidak ada data untuk diunduh.")
+      showError("Gagal Mengunduh", "Tidak ada data untuk diunduh.")
       return
     }
 
@@ -103,6 +105,7 @@ export default function PaymentsPage() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    success("Berhasil Mengunduh", `Data pembayaran berhasil diunduh dalam format CSV.`)
   }
 
   const handleDeleteOne = async (id: string, name: string) => {
@@ -116,8 +119,9 @@ export default function PaymentsPage() {
         .eq("id", id)
       
       if (error) {
-        alert("Gagal menghapus data: " + error.message)
+        showError("Gagal Menghapus", error.message)
       } else {
+        success("Berhasil Menghapus", "Data pembayaran berhasil dihapus.")
         fetchAllPayments()
       }
       setLoading(false)
@@ -127,7 +131,7 @@ export default function PaymentsPage() {
   const handleDeleteVerified = async () => {
     const paidPayments = allPayments.filter(p => p.status === 'paid')
     if (paidPayments.length === 0) {
-      alert("Tidak ada data pembayaran lunas untuk dihapus.")
+      showError("Gagal Menghapus", "Tidak ada data pembayaran lunas untuk dihapus.")
       return
     }
 
@@ -141,9 +145,9 @@ export default function PaymentsPage() {
         .eq("status", "paid")
       
       if (error) {
-        alert("Gagal menghapus data: " + error.message)
+        showError("Gagal Menghapus", error.message)
       } else {
-        alert("Data berhasil dihapus.")
+        success("Berhasil Dihapus", "Seluruh data pembayaran lunas berhasil dihapus.")
         fetchAllPayments()
       }
       setLoading(false)
@@ -181,14 +185,14 @@ export default function PaymentsPage() {
     try {
       const response = await bulkDeletePayments(selectedIds)
       if (response.success) {
-        alert(response.message)
+        success("Berhasil Menghapus", response.message)
         setSelectedIds([])
         fetchAllPayments()
       } else {
-        alert("Gagal: " + response.error)
+        showError("Gagal Menghapus", response.error || "Terjadi kesalahan")
       }
     } catch (error: any) {
-      alert("Error: " + error.message)
+      showError("Gagal Menghapus", error.message)
     } finally {
       setIsBulkDeleting(false)
     }

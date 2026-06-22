@@ -18,6 +18,7 @@ import { verifyPayment } from "@/app/actions/payment-actions"
 import { generateReceiptPDF } from "@/lib/receipt-generator"
 import { getBillingComponents } from "@/app/actions/bill-actions"
 import { Printer, Loader2 } from "lucide-react"
+import { useToast } from "@/components/ui/Toast"
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +30,7 @@ export default function VerificationPage() {
   const [components, setComponents] = useState<any[]>([])
   const [isVerifying, setIsVerifying] = useState(false)
   const [verifiedPayment, setVerifiedPayment] = useState<any>(null)
+  const { success, error: showError } = useToast()
 
   useEffect(() => {
     fetchPendingPayments()
@@ -67,13 +69,15 @@ export default function VerificationPage() {
     const res = await verifyPayment(id, status)
     
     if (!res.success) {
-      alert(res.error)
+      showError("Verifikasi Gagal", res.error)
       setIsVerifying(false)
     } else {
       if (status === 'paid') {
         setVerifiedPayment(selectedPayment)
+        success("Pembayaran Berhasil", "Data pembayaran santri berhasil disimpan.")
       } else {
         setSelectedPayment(null)
+        success("Pembayaran Ditolak", "Status pembayaran telah diperbarui.")
       }
       fetchPendingPayments()
       setIsVerifying(false)
