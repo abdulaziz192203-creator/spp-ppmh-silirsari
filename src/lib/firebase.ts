@@ -17,7 +17,7 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const requestForToken = async (vapidKey: string) => {
   try {
     const messaging = getMessaging(app);
-    let registration = null;
+    let registration: ServiceWorkerRegistration | undefined;
     
     // Explicitly register the service worker
     if ('serviceWorker' in navigator) {
