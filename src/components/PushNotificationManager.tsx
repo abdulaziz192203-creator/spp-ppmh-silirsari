@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react"
 import { requestForToken, onMessageListener } from "@/lib/firebase"
 import { supabase } from "@/lib/supabase"
-import { Bell, BellOff, X } from "lucide-react"
+import { Bell, X } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
+import { useToast } from "@/components/ui/Toast"
 
 const VAPID_KEY = "BIlb2fX56vIeKTyiMwq8BV9nhftZxiUTimU8nTjNPy_2kv0SJYvqsD-ORuG38kLUukdoTj7kGMTcQVQ45X5gLEo"
 
 export default function PushNotificationManager() {
   const [showPrompt, setShowPrompt] = useState(false)
   const [permission, setPermission] = useState<NotificationPermission>("default")
+  const toast = useToast()
 
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -19,6 +21,9 @@ export default function PushNotificationManager() {
         // Show prompt after 3 seconds
         const timer = setTimeout(() => setShowPrompt(true), 3000)
         return () => clearTimeout(timer)
+      } else if (Notification.permission === "granted") {
+        // Make sure token is requested even if already granted (to refresh/register in current session)
+        requestForToken(VAPID_KEY)
       }
     }
   }, [])
@@ -41,6 +46,9 @@ export default function PushNotificationManager() {
       }
       setPermission("granted")
       setShowPrompt(false)
+      toast.success("Notifikasi Diaktifkan", "Anda akan menerima pemberitahuan penting.")
+    } else {
+      toast.error("Gagal", "Tidak dapat mengaktifkan notifikasi. Periksa pengaturan browser Anda.")
     }
   }
 
@@ -48,8 +56,10 @@ export default function PushNotificationManager() {
   useEffect(() => {
     onMessageListener().then((payload: any) => {
       console.log("Foreground notification received:", payload)
-      // You can show a custom toast here if you want
-    })
+      if (payload && payload.notification) {
+        toast.info(payload.notification.title, payload.notification.body)
+      }
+    }).catch(err => console.log('failed: ', err))
   }, [])
 
   if (!showPrompt) return null

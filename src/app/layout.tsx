@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Outfit } from "next/font/google";
 import "./globals.css";
 import { ToastProvider } from "@/components/ui/Toast";
-
+import PushNotificationManager from "@/components/PushNotificationManager";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
@@ -33,6 +33,7 @@ export default function RootLayout({
     <html lang="id">
       <body className={`${inter.variable} ${outfit.variable} font-sans min-h-screen bg-slate-950 text-slate-50`}>
         <ToastProvider>
+          <PushNotificationManager />
           <div className="fixed inset-0 pointer-events-none -z-10 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-900/20 via-slate-950 to-slate-950"></div>
           {children}
         </ToastProvider>

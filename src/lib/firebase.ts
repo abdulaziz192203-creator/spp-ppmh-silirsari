@@ -17,7 +17,19 @@ const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const requestForToken = async (vapidKey: string) => {
   try {
     const messaging = getMessaging(app);
-    const currentToken = await getToken(messaging, { vapidKey });
+    let registration = null;
+    
+    // Explicitly register the service worker
+    if ('serviceWorker' in navigator) {
+      registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js');
+      console.log('Service Worker registered with scope:', registration.scope);
+    }
+
+    const currentToken = await getToken(messaging, { 
+      vapidKey,
+      serviceWorkerRegistration: registration 
+    });
+    
     if (currentToken) {
       console.log('Current token for client: ', currentToken);
       return currentToken;
