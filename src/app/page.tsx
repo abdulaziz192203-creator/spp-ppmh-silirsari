@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { LogIn, User, ShieldCheck, Loader2, Crown } from "lucide-react"
@@ -14,6 +14,31 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        // Fetch role to redirect correctly
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single()
+
+        if (profile) {
+          const redirectMap: Record<string, string> = {
+            admin: "/admin",
+            parent: "/dashboard",
+            pimpinan: "/pimpinan"
+          }
+          router.push(redirectMap[profile.role] || "/")
+        }
+      }
+    }
+    checkUser()
+  }, [router])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
