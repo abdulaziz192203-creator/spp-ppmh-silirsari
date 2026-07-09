@@ -71,7 +71,7 @@ export default function PushNotificationManager() {
               body: payload.notification.body,
               icon: '/logo-ppmh.png',
               vibrate: [200, 100, 200]
-            });
+            } as any);
           });
         }
       }
