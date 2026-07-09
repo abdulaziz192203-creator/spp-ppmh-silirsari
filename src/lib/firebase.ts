@@ -43,11 +43,10 @@ export const requestForToken = async (vapidKey: string) => {
   }
 };
 
-export const onMessageListener = () =>
-  new Promise((resolve) => {
-    const messaging = getMessaging(app);
-    onMessage(messaging, (payload) => {
-      console.log("Payload", payload);
-      resolve(payload);
-    });
+export const onMessageListener = (callback: (payload: any) => void) => {
+  const messaging = getMessaging(app);
+  return onMessage(messaging, (payload) => {
+    console.log("Foreground payload:", payload);
+    callback(payload);
   });
+};

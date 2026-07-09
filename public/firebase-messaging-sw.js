@@ -18,7 +18,9 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: '/logo-ppmh.png'
+    icon: '/logo-ppmh.png',
+    vibrate: [200, 100, 200, 100, 200],
+    requireInteraction: true
   };
 
   self.registration.showNotification(notificationTitle, notificationOptions);

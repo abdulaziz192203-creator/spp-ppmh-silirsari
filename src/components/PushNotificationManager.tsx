@@ -14,6 +14,21 @@ export default function PushNotificationManager() {
   const [permission, setPermission] = useState<NotificationPermission>("default")
   const toast = useToast()
 
+  const saveTokenToDb = async (token: string) => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
+      await supabase
+        .from("push_subscriptions")
+        .upsert([
+          { 
+            user_id: session.user.id, 
+            token: token,
+            device_type: /iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'ios' : 'android'
+          }
+        ], { onConflict: 'token' })
+    }
+  }
+
   useEffect(() => {
     if (typeof window !== "undefined" && "Notification" in window) {
       setPermission(Notification.permission)
@@ -22,8 +37,10 @@ export default function PushNotificationManager() {
         const timer = setTimeout(() => setShowPrompt(true), 3000)
         return () => clearTimeout(timer)
       } else if (Notification.permission === "granted") {
-        // Make sure token is requested even if already granted (to refresh/register in current session)
-        requestForToken(VAPID_KEY)
+        // Refresh token and save to DB if logged in
+        requestForToken(VAPID_KEY).then((token) => {
+          if (token) saveTokenToDb(token);
+        })
       }
     }
   }, [])
@@ -31,19 +48,7 @@ export default function PushNotificationManager() {
   const handleEnableNotifications = async () => {
     const token = await requestForToken(VAPID_KEY)
     if (token) {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        // Save to database
-        await supabase
-          .from("push_subscriptions")
-          .upsert([
-            { 
-              user_id: session.user.id, 
-              token: token,
-              device_type: /iPhone|iPad|iPod/i.test(navigator.userAgent) ? 'ios' : 'android'
-            }
-          ], { onConflict: 'token' })
-      }
+      await saveTokenToDb(token)
       setPermission("granted")
       setShowPrompt(false)
       toast.success("Notifikasi Diaktifkan", "Anda akan menerima pemberitahuan penting.")
@@ -54,12 +59,29 @@ export default function PushNotificationManager() {
 
   // Listen for foreground messages
   useEffect(() => {
-    onMessageListener().then((payload: any) => {
+    const unsubscribe = onMessageListener((payload: any) => {
       console.log("Foreground notification received:", payload)
       if (payload && payload.notification) {
         toast.info(payload.notification.title, payload.notification.body)
+        
+        // Force OS level notification even in foreground if supported
+        if (Notification.permission === 'granted') {
+          navigator.serviceWorker.ready.then((registration) => {
+            registration.showNotification(payload.notification.title, {
+              body: payload.notification.body,
+              icon: '/logo-ppmh.png',
+              vibrate: [200, 100, 200]
+            });
+          });
+        }
       }
-    }).catch(err => console.log('failed: ', err))
+    });
+
+    return () => {
+      if (unsubscribe && typeof unsubscribe === 'function') {
+        unsubscribe();
+      }
+    };
   }, [])
 
   if (!showPrompt) return null
