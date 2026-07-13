@@ -377,7 +377,9 @@ export default function BillsPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {components.map((comp) => (
                   <div key={comp.key}>
-                    <label className="block text-xs text-slate-400 mb-1">{comp.label}</label>
+                    <label className="block text-xs text-slate-400 mb-1">
+                      {activeJenjang === 'kuliah' && comp.key === 'sekolah_formal' ? 'Uang UKT' : comp.label}
+                    </label>
                     <div className="relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-medium">Rp</span>
                       <input 

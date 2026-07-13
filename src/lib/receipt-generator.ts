@@ -91,7 +91,7 @@ export const generateReceiptPDF = async (data: ReceiptData) => {
     currentY += 2;
     if (components && components.length > 0) {
       const tableRows = components.map(c => [
-        c.label,
+        student?.jenjang === 'kuliah' && c.key === 'sekolah_formal' ? 'Uang UKT' : c.label,
         formatCurrency(payment.rates?.[c.key] || 0)
       ]);
       

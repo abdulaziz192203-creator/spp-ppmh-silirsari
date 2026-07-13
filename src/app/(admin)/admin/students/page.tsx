@@ -426,14 +426,16 @@ export default function StudentsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1">Kelas</label>
+                    <label className="block text-sm text-slate-400 mb-1">
+                      {newStudent.jenjang === 'kuliah' ? 'Program Studi / Semester' : 'Kelas'}
+                    </label>
                     <input 
                       type="text" 
                       required 
                       value={newStudent.class_room}
                       onChange={(e) => setNewStudent({...newStudent, class_room: e.target.value})}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 outline-none"
-                      placeholder="Contoh: 7-A"
+                      placeholder={newStudent.jenjang === 'kuliah' ? 'Contoh: S1 Teknik Informatika (Smt 3)' : 'Contoh: 7-A'}
                     />
                   </div>
                 </div>
@@ -564,13 +566,16 @@ export default function StudentsPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm text-slate-400 mb-1">Kelas</label>
+                    <label className="block text-sm text-slate-400 mb-1">
+                      {selectedStudent.jenjang === 'kuliah' ? 'Program Studi / Semester' : 'Kelas'}
+                    </label>
                     <input 
                       type="text" 
                       required 
                       value={selectedStudent.class_room}
                       onChange={(e) => setSelectedStudent({...selectedStudent, class_room: e.target.value})}
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 outline-none"
+                      placeholder={selectedStudent.jenjang === 'kuliah' ? 'Contoh: S1 Teknik Informatika (Smt 3)' : 'Contoh: 7-A'}
                     />
                   </div>
                 </div>

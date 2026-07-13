@@ -333,7 +333,9 @@ export default function BillsPage() {
                         const amount = billingRates[comp.key] || 0
                         return (
                           <div key={comp.key} className="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                              <p className="opacity-50 mb-1 scale-90 origin-left">{comp.label}</p>
+                              <p className="opacity-50 mb-1 scale-90 origin-left">
+                                {studentJenjang === 'kuliah' && comp.key === 'sekolah_formal' ? 'Uang UKT' : comp.label}
+                              </p>
                               <p className="text-slate-600">{amount > 0 ? formatCurrency(amount) : '-'}</p>
                           </div>
                         )
