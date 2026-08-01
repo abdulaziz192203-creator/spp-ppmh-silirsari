@@ -47,7 +47,6 @@ export default function BillsPage() {
   const [isManagingComponents, setIsManagingComponents] = useState(false)
   const [newCompLabel, setNewCompLabel] = useState("")
   const [savingComponents, setSavingComponents] = useState(false)
-  const [keringananAmount, setKeringananAmount] = useState(0)
   
   // Rates per jenjang
   const [rates, setRates] = useState<BillingRatesMap>(() => {
@@ -220,26 +219,7 @@ export default function BillsPage() {
       setLoading(false)
     }
   }
-  
-  const handleGenerateKeringananBills = async () => {
-    if (keringananAmount <= 0) return alert('Masukkan nominal keringanan yang valid');
-    if (!confirm(`Generate tagihan KERINGANAN untuk bulan ${selectedMonth}/${selectedYear} dengan nominal Rp ${keringananAmount}?`)) return;
-    setLoading(true);
-    try {
-      const response = await generateKeringananBills(selectedMonth, selectedYear, keringananAmount);
-      if (response.success) {
-        alert(response.message);
-        fetchStats();
-        fetchRates();
-      } else {
-        alert('Gagal: ' + response.error);
-      }
-    } catch (error: any) {
-      alert('Gagal generate tagihan keringanan: ' + error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   return (
     <div className="space-y-8">
