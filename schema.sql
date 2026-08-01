@@ -14,6 +14,8 @@ CREATE TABLE students (
   nisn TEXT UNIQUE NOT NULL,
   class_room TEXT,
   jenjang TEXT CHECK (jenjang IN ('tidak_sekolah', 'sd_mi', 'smp_mts', 'sma_ma', 'kuliah')) DEFAULT 'smp_mts',
+  status_biaya TEXT CHECK (status_biaya IN ('reguler', 'gratis', 'keringanan')) DEFAULT 'reguler',
+  nominal_khusus BIGINT,
   address TEXT,
   parent_id UUID REFERENCES auth.users(id),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL

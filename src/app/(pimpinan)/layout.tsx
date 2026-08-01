@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { supabase, isSupabaseConfigured } from "@/lib/supabase"
 import { BarChart3, Users, Wallet, LogOut, ChevronRight, Menu, X, Crown, Loader2, Newspaper } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
@@ -25,6 +25,21 @@ export default function PimpinanLayout({ children }: { children: React.ReactNode
 
   useEffect(() => {
     const checkAuth = async () => {
+      if (!isSupabaseConfigured) {
+        // If dev session exists, use it
+        try {
+          const { session } = await (await import('@/lib/dev-auth')).devAuth.getSession()
+          if (session?.user) {
+            const meta = (await import('@/lib/dev-auth')).devAuth.getProfile()
+            setUserName(meta?.full_name || 'Pemimpin Dev')
+            setAuthenticated(true)
+          }
+        } catch (e) {
+          // ignore
+        }
+        setLoading(false)
+        return
+      }
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push("/"); return }
       const { data: profile } = await supabase.from("profiles").select("role, full_name").eq("id", user.id).single()
@@ -40,6 +55,8 @@ export default function PimpinanLayout({ children }: { children: React.ReactNode
   }, [router])
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/") }
+
+  const safeHandleLogout = async () => { if (!isSupabaseConfigured) { router.push('/'); return } await supabase.auth.signOut(); router.push('/') }
 
   if (loading) {
     return (
@@ -99,7 +116,7 @@ export default function PimpinanLayout({ children }: { children: React.ReactNode
               <p className="text-sm font-bold text-slate-200 truncate">{userName}</p>
             </div>
           )}
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-3 text-slate-400 hover:text-red-400 transition-all rounded-xl hover:bg-red-400/5">
+          <button onClick={safeHandleLogout} className="w-full flex items-center gap-3 px-3 py-3 text-slate-400 hover:text-red-400 transition-all rounded-xl hover:bg-red-400/5">
             <LogOut size={20} />
             {sidebarOpen && <span className="font-medium text-sm">Keluar</span>}
           </button>
@@ -163,7 +180,7 @@ export default function PimpinanLayout({ children }: { children: React.ReactNode
                 ))}
               </nav>
               <div className="absolute bottom-6 left-6 right-6">
-                <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-4 text-slate-400 hover:text-red-400 transition-all">
+                <button onClick={safeHandleLogout} className="w-full flex items-center gap-3 px-3 py-4 text-slate-400 hover:text-red-400 transition-all">
                   <LogOut size={20} /><span className="font-medium">Keluar</span>
                 </button>
               </div>

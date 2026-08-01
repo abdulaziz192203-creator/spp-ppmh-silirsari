@@ -2,41 +2,21 @@
 
 import { useEffect, useState } from "react"
 import { usePathname, useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { supabase, isSupabaseConfigured } from "@/lib/supabase"
 import { 
   BarChart, 
-  CreditCard, 
-  History, 
-  User, 
-  Loader2, 
-  LogOut, 
-  ChevronRight, 
-  Menu as MenuIcon, 
-  X,
-  Bell,
-  AlertTriangle,
-  Newspaper,
-  QrCode,
-  CreditCard as MutasiIcon
-} from "lucide-react"
-import { cn, isPaymentOverdue, getMonthName } from "@/lib/utils"
-import { motion, AnimatePresence } from "framer-motion"
-import PushNotificationManager from "@/components/PushNotificationManager"
-
-export default function ParentLayout({ children }: { children: React.ReactNode }) {
-  const [loading, setLoading] = useState(true)
-  const [authenticated, setAuthenticated] = useState(false)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [unpaidCount, setUnpaidCount] = useState(0)
-  const [overdueCount, setOverdueCount] = useState(0)
-  const [overdueList, setOverdueList] = useState<any[]>([])
-  const [showNotifications, setShowNotifications] = useState(false)
-  const pathname = usePathname()
-  const router = useRouter()
-
   useEffect(() => {
     const checkAuth = async () => {
+      if (!isSupabaseConfigured) {
+        try {
+          const { session } = await (await import('@/lib/dev-auth')).devAuth.getSession()
+          if (session?.user) {
+            setAuthenticated(true)
+          }
+        } catch (e) {}
+        setLoading(false)
+        return
+      }
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push("/")
@@ -81,8 +61,43 @@ export default function ParentLayout({ children }: { children: React.ReactNode }
 
       checkAuth()
     }, [router])
+        .eq("id", user.id)
+        .single()
+
+      if (profile?.role !== 'parent') {
+        router.push(profile?.role === 'admin' ? '/admin' : '/')
+        return
+      }
+
+      setAuthenticated(true)
+      setLoading(false)
+      
+        const { data: payments } = await supabase
+          .from("payments")
+          .select("*")
+          .eq("student_id", (
+            await supabase.from("students").select("id").eq("nisn", profile.nisn).single()
+          ).data?.id)
+        
+        if (payments) {
+          const unpaid = payments.filter(p => p.status === 'unpaid' || p.status === 'rejected')
+          setUnpaidCount(unpaid.length)
+          
+          // Fetch deadline
+          const { data: settings } = await supabase.from("system_settings").select("value").eq("key", "payment_deadline_day").single()
+          const deadline = settings ? parseInt(settings.value) : 10
+          
+          const overdue = unpaid.filter(p => isPaymentOverdue(p.month, p.year, deadline))
+          setOverdueCount(overdue.length)
+          setOverdueList(overdue)
+        }
+      }
+
+      checkAuth()
+    }, [router])
 
   const handleLogout = async () => {
+    if (!isSupabaseConfigured) { router.push('/'); return }
     await supabase.auth.signOut()
     router.push("/")
   }

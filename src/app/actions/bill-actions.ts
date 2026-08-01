@@ -8,18 +8,28 @@ type BillingRatesMap = Record<string, Record<string, number>>
 
 export async function saveBillingRates(rates: BillingRatesMap) {
   try {
-    // Save each jenjang's rates as a separate system_settings entry
     for (const jenjang of JENJANG_OPTIONS) {
+      // Reguler
       const rateData = rates[jenjang.value] || {}
-      const { error } = await supabaseAdmin
+      const { error: err1 } = await supabaseAdmin
         .from("system_settings")
         .upsert({
           key: `billing_rates_${jenjang.value}`,
           value: JSON.stringify(rateData),
           updated_at: new Date().toISOString()
         }, { onConflict: 'key' })
+      if (err1) throw err1
 
-      if (error) throw error
+      // Keringanan
+      const rateDataKeringanan = rates[`keringanan_${jenjang.value}`] || {}
+      const { error: err2 } = await supabaseAdmin
+        .from("system_settings")
+        .upsert({
+          key: `billing_rates_keringanan_${jenjang.value}`,
+          value: JSON.stringify(rateDataKeringanan),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' })
+      if (err2) throw err2
     }
 
     return { success: true }
@@ -69,15 +79,16 @@ export async function getBillingRates(): Promise<BillingRatesMap> {
   const components = await getBillingComponents()
 
   for (const jenjang of JENJANG_OPTIONS) {
-    const { data } = await supabaseAdmin
+    // Reguler
+    const { data: dataReguler } = await supabaseAdmin
       .from("system_settings")
       .select("value")
       .eq("key", `billing_rates_${jenjang.value}`)
       .single()
 
-    if (data) {
+    if (dataReguler) {
       try {
-        rates[jenjang.value] = JSON.parse(data.value)
+        rates[jenjang.value] = JSON.parse(dataReguler.value)
       } catch {
         rates[jenjang.value] = {}
       }
@@ -93,10 +104,30 @@ export async function getBillingRates(): Promise<BillingRatesMap> {
       rates[jenjang.value] = defaults[jenjang.value] || {}
     }
 
+    // Keringanan
+    const { data: dataKeringanan } = await supabaseAdmin
+      .from("system_settings")
+      .select("value")
+      .eq("key", `billing_rates_keringanan_${jenjang.value}`)
+      .single()
+
+    if (dataKeringanan) {
+      try {
+        rates[`keringanan_${jenjang.value}`] = JSON.parse(dataKeringanan.value)
+      } catch {
+        rates[`keringanan_${jenjang.value}`] = {}
+      }
+    } else {
+      rates[`keringanan_${jenjang.value}`] = {}
+    }
+
     // Ensure all current components exist in the rates (default to 0 if missing)
     components.forEach(comp => {
       if (rates[jenjang.value][comp.key] === undefined) {
         rates[jenjang.value][comp.key] = 0
+      }
+      if (rates[`keringanan_${jenjang.value}`][comp.key] === undefined) {
+        rates[`keringanan_${jenjang.value}`][comp.key] = 0
       }
     })
   }
@@ -106,10 +137,10 @@ export async function getBillingRates(): Promise<BillingRatesMap> {
 
 export async function generateBulkBills(month: number, year: number) {
   try {
-    // 1. Ambil semua santri beserta jenjangnya
+    // 1. Ambil semua santri beserta jenjang dan status biaya
     const { data: students, error: studentError } = await supabaseAdmin
       .from("students")
-      .select("id, jenjang")
+      .select("id, jenjang, status_biaya, nominal_khusus")
     
     if (studentError) throw studentError
     if (!students || students.length === 0) {
@@ -122,15 +153,25 @@ export async function generateBulkBills(month: number, year: number) {
     // 3. Siapkan data tagihan per santri sesuai jenjang
     const billingData = students.map(s => {
       const jenjang = s.jenjang || 'smp_mts'
-      const jenjangRates = rates[jenjang] || {}
-      const totalAmount = Object.values(jenjangRates).reduce((sum: number, val) => sum + (Number(val) || 0), 0)
+      const status_biaya = s.status_biaya || 'reguler'
+      
+      const targetRateKey = status_biaya === 'keringanan' ? `keringanan_${jenjang}` : jenjang
+      const jenjangRates = rates[targetRateKey] || {}
+      
+      let totalAmount = Object.values(jenjangRates).reduce((sum: number, val) => sum + (Number(val) || 0), 0)
+      let status = 'unpaid'
+
+      if (status_biaya === 'gratis') {
+        totalAmount = 0
+        status = 'paid' // Otomatis lunas/beasiswa jika yatim
+      }
 
       return {
         student_id: s.id,
         month,
         year,
         amount: totalAmount,
-        status: 'unpaid'
+        status: status
       }
     })
 

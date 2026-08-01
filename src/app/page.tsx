@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { supabase, isSupabaseConfigured } from "@/lib/supabase"
+import { devAuth } from "@/lib/dev-auth"
 import { LogIn, User, ShieldCheck, Loader2, Crown } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence } from "framer-motion"
@@ -18,6 +19,7 @@ export default function LoginPage() {
   // Check if user is already logged in
   useEffect(() => {
     const checkUser = async () => {
+      if (!isSupabaseConfigured) return
       const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
         // Fetch role to redirect correctly
@@ -40,6 +42,13 @@ export default function LoginPage() {
     checkUser()
   }, [router])
 
+  // Show configuration error early
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setError("Supabase belum dikonfigurasi. Tambahkan NEXT_PUBLIC_SUPABASE_URL dan NEXT_PUBLIC_SUPABASE_ANON_KEY di .env.local atau environment variables hosting Anda.")
+    }
+  }, [])
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -47,24 +56,34 @@ export default function LoginPage() {
 
     try {
       const email = role === "parent" ? `${identifier}@spp-ppmh.id` : identifier
-      const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      })
-
-      if (authError) throw authError
+      let data: any = null
+      if (!isSupabaseConfigured) {
+        // dev fallback
+        const result = await devAuth.signIn(role, identifier, password)
+        data = { user: result.user }
+      } else {
+        const res = await supabase.auth.signInWithPassword({ email, password })
+        data = res.data
+        if (res.error) throw res.error
+      }
 
       // Check role in profiles table
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user?.id)
-        .single()
-
-      if (profileError) throw profileError
+      let profile: any = null
+      if (!isSupabaseConfigured) {
+        const p = devAuth.getProfile()
+        profile = { role: p?.role }
+      } else {
+        const { data: profileData, error: profileError } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", data.user?.id)
+          .single()
+        if (profileError) throw profileError
+        profile = profileData
+      }
 
       if (profile.role !== role) {
-        await supabase.auth.signOut()
+        if (isSupabaseConfigured) await supabase.auth.signOut()
         const roleLabels: Record<string, string> = {
           admin: "Admin",
           parent: "Wali Santri",
@@ -221,7 +240,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading}
+                disabled={loading || !isSupabaseConfigured}
               className={cn(
                 "w-full flex items-center justify-center gap-3 font-black uppercase tracking-widest text-xs py-5 rounded-[24px] transition-all duration-300 shadow-xl active:scale-[0.98]",
                 currentConfig.submitColor,

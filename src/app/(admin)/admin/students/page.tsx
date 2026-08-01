@@ -38,7 +38,9 @@ export default function StudentsPage() {
     address: "",
     password: "",
     parent_name: "",
-    parent_phone: ""
+    parent_phone: "",
+    status_biaya: "reguler",
+    nominal_khusus: ""
   })
   const [schoolName, setSchoolName] = useState("Pondok Pesantren Miftahul Huda")
 
@@ -84,10 +86,11 @@ export default function StudentsPage() {
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    const response = await createStudentWithAuth(newStudent)
+    const payload = { ...newStudent, nominal_khusus: newStudent.status_biaya === 'keringanan' ? Number(newStudent.nominal_khusus) : null }
+    const response = await createStudentWithAuth(payload)
     if (response.success) {
       setIsModalOpen(false)
-      setNewStudent({ name: "", nisn: "", class_room: "", jenjang: "smp_mts", address: "", password: "", parent_name: "", parent_phone: "" })
+      setNewStudent({ name: "", nisn: "", class_room: "", jenjang: "smp_mts", address: "", password: "", parent_name: "", parent_phone: "", status_biaya: "reguler", nominal_khusus: "" })
       fetchStudents()
       alert(response.message)
     } else {
@@ -120,7 +123,9 @@ export default function StudentsPage() {
       address: selectedStudent.address,
       parent_name: selectedStudent.parent_name,
       parent_phone: selectedStudent.parent_phone,
-      parentId: selectedStudent.parent_id
+      parentId: selectedStudent.parent_id,
+      status_biaya: selectedStudent.status_biaya || "reguler",
+      nominal_khusus: selectedStudent.status_biaya === 'keringanan' ? Number(selectedStudent.nominal_khusus) : null
     })
     
     if (response.success) {
@@ -229,9 +234,21 @@ export default function StudentsPage() {
                     <td className="px-6 py-4 font-medium text-slate-200">{student.name}</td>
                     <td className="px-6 py-4 text-slate-400">{student.nisn}</td>
                     <td className="px-6 py-4">
-                      <span className="bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-lg text-xs font-medium">
-                        {student.class_room}
-                      </span>
+                      <div className="flex flex-col gap-1">
+                        <span className="bg-blue-500/10 text-blue-400 px-2.5 py-1 rounded-lg text-xs font-medium w-max">
+                          {student.class_room}
+                        </span>
+                        {student.status_biaya === 'gratis' && (
+                          <span className="bg-emerald-500/10 text-emerald-400 px-2.5 py-1 rounded-lg text-[10px] font-bold w-max uppercase tracking-wider">
+                            Gratis (Yatim)
+                          </span>
+                        )}
+                        {student.status_biaya === 'keringanan' && (
+                          <span className="bg-amber-500/10 text-amber-400 px-2.5 py-1 rounded-lg text-[10px] font-bold w-max uppercase tracking-wider">
+                            Keringanan
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={cn("px-2.5 py-1 rounded-lg text-xs font-medium border", getJenjangColor(student.jenjang || 'smp_mts'))}>
@@ -308,13 +325,23 @@ export default function StudentsPage() {
                     <p className="text-xs text-slate-500 font-medium">NISN: {student.nisn}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="bg-blue-500/10 text-blue-400 px-2 py-1 rounded-lg text-[10px] font-bold uppercase">
                     {student.class_room}
                   </span>
                   <span className={cn("px-2 py-1 rounded-lg text-[10px] font-bold border", getJenjangColor(student.jenjang || 'smp_mts'))}>
                     {getJenjangLabel(student.jenjang || 'smp_mts')}
                   </span>
+                  {student.status_biaya === 'gratis' && (
+                    <span className="bg-emerald-500/10 text-emerald-400 px-2 py-1 rounded-lg text-[10px] font-bold uppercase">
+                      Gratis
+                    </span>
+                  )}
+                  {student.status_biaya === 'keringanan' && (
+                    <span className="bg-amber-500/10 text-amber-400 px-2 py-1 rounded-lg text-[10px] font-bold uppercase">
+                      Diskon
+                    </span>
+                  )}
                 </div>
               </div>
               
@@ -437,6 +464,18 @@ export default function StudentsPage() {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 outline-none"
                       placeholder={newStudent.jenjang === 'kuliah' ? 'Contoh: S1 Teknik Informatika (Smt 3)' : 'Contoh: 7-A'}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Status SPP</label>
+                    <select
+                      value={newStudent.status_biaya}
+                      onChange={(e) => setNewStudent({...newStudent, status_biaya: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 outline-none appearance-none"
+                    >
+                      <option value="reguler">Reguler (Bayar Penuh)</option>
+                      <option value="gratis">Gratis (Yatim/Piatu/Kurang Mampu)</option>
+                      <option value="keringanan">Keringanan (Diskon Khusus)</option>
+                    </select>
                   </div>
                 </div>
                 <div>
@@ -577,6 +616,18 @@ export default function StudentsPage() {
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 outline-none"
                       placeholder={selectedStudent.jenjang === 'kuliah' ? 'Contoh: S1 Teknik Informatika (Smt 3)' : 'Contoh: 7-A'}
                     />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-slate-400 mb-1">Status SPP</label>
+                    <select
+                      value={selectedStudent.status_biaya || 'reguler'}
+                      onChange={(e) => setSelectedStudent({...selectedStudent, status_biaya: e.target.value})}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500/50 outline-none appearance-none"
+                    >
+                      <option value="reguler">Reguler (Bayar Penuh)</option>
+                      <option value="gratis">Gratis (Yatim/Piatu/Kurang Mampu)</option>
+                      <option value="keringanan">Keringanan (Diskon Khusus)</option>
+                    </select>
                   </div>
                 </div>
                 <div>

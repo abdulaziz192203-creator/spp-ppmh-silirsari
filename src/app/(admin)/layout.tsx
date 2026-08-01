@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
-import { supabase } from "@/lib/supabase"
+import { supabase, isSupabaseConfigured } from "@/lib/supabase"
 import { 
   BarChart, 
   Users, 
@@ -39,12 +39,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   ]
 
   const handleLogout = async () => {
+    if (!isSupabaseConfigured) { router.push('/'); return }
     await supabase.auth.signOut()
     router.push("/")
   }
 
   useEffect(() => {
     const fetchPendingCount = async () => {
+      if (!isSupabaseConfigured) return
       const { count } = await supabase
         .from("payments")
         .select("*", { count: 'exact', head: true })
@@ -53,11 +55,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       setPendingCount(count || 0)
     }
 
-    fetchPendingCount()
-    
-    // Refresh count on navigation or periodically
-    const interval = setInterval(fetchPendingCount, 10000) // Poll every 10s
-    return () => clearInterval(interval)
+    // If dev session exists, do not call Supabase
+    (async () => {
+      if (!isSupabaseConfigured) {
+        try {
+          const { session } = await (await import('@/lib/dev-auth')).devAuth.getSession()
+          if (session?.user) return
+        } catch (e) {}
+      }
+      fetchPendingCount()
+      const interval = setInterval(fetchPendingCount, 10000) // Poll every 10s
+      return () => clearInterval(interval)
+    })()
   }, [])
 
   return (

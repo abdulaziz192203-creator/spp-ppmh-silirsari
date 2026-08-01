@@ -29,10 +29,24 @@ Sistem informasi pembayaran bulanan santri berbasis web (Next.js) dan backend mo
   NEXT_PUBLIC_SUPABASE_ANON_KEY=key_anon_anda
   ```
 
+Jika Anda ingin membuat file `.env.local` dari command-line (lebih cepat), jalankan dari root proyek:
+
+```bash
+node scripts/create-env.js --url https://your-project.supabase.co --anon your-anon-key
+```
+
+Atau di Windows PowerShell:
+
+```powershell
+node scripts/create-env.js --url https://your-project.supabase.co --anon your-anon-key
+```
+
 ### 3. Deploy ke Vercel
 - Push code ke GitHub.
 - Hubungkan repository ke [Vercel](https://vercel.com).
 - Masukkan Environment Variables di dashboard Vercel.
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - Klik **Deploy**.
 
 ### 4. Build Menjadi Aplikasi Android

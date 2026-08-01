@@ -12,9 +12,11 @@ export async function createStudentWithAuth(formData: {
   password?: string
   parent_name?: string
   parent_phone?: string
+  status_biaya?: string
+  nominal_khusus?: number | null
 }) {
   try {
-    const { name, nisn, class_room, jenjang, address, password, parent_name, parent_phone } = formData
+    const { name, nisn, class_room, jenjang, address, password, parent_name, parent_phone, status_biaya = 'reguler', nominal_khusus = null } = formData
     const loginEmail = `${nisn}@spp-ppmh.id`
     const loginPassword = password || `santri${nisn}` // Default password
 
@@ -66,7 +68,9 @@ export async function createStudentWithAuth(formData: {
           address,
           parent_name,
           parent_phone,
-          parent_id: userId
+          parent_id: userId,
+          status_biaya,
+          nominal_khusus
         }
       ])
 
@@ -126,14 +130,16 @@ export async function updateStudent(studentId: string, formData: {
   parent_name?: string
   parent_phone?: string
   parentId?: string
+  status_biaya?: string
+  nominal_khusus?: number | null
 }) {
   try {
-    const { name, class_room, jenjang, address, parent_name, parent_phone, parentId } = formData
+    const { name, class_room, jenjang, address, parent_name, parent_phone, parentId, status_biaya = 'reguler', nominal_khusus = null } = formData
 
     // 1. Update students table
     const { error: studentError } = await supabaseAdmin
       .from("students")
-      .update({ name, class_room, jenjang, address, parent_name, parent_phone })
+      .update({ name, class_room, jenjang, address, parent_name, parent_phone, status_biaya, nominal_khusus })
       .eq("id", studentId)
 
     if (studentError) throw new Error(`Gagal update data santri: ${studentError.message}`)

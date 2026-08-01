@@ -41,19 +41,23 @@ export default function BillsPage() {
   const [deadlineDay, setDeadlineDay] = useState(10)
   const [savingDeadline, setSavingDeadline] = useState(false)
   const [activeJenjang, setActiveJenjang] = useState<string>(JENJANG_OPTIONS[0].value)
+  const [rateMode, setRateMode] = useState<'reguler' | 'keringanan'>('reguler')
   const [studentCounts, setStudentCounts] = useState<Record<string, number>>({})
   const [components, setComponents] = useState<BillingComponent[]>([])
   const [isManagingComponents, setIsManagingComponents] = useState(false)
   const [newCompLabel, setNewCompLabel] = useState("")
   const [savingComponents, setSavingComponents] = useState(false)
+  const [keringananAmount, setKeringananAmount] = useState(0)
   
   // Rates per jenjang
   const [rates, setRates] = useState<BillingRatesMap>(() => {
     const initial: BillingRatesMap = {}
     JENJANG_OPTIONS.forEach(j => {
       initial[j.value] = {}
+      initial[`keringanan_${j.value}`] = {}
       BILLING_COMPONENTS.forEach(c => {
         initial[j.value][c.key] = 0
+        initial[`keringanan_${j.value}`][c.key] = 0
       })
     })
     return initial
@@ -180,17 +184,19 @@ export default function BillsPage() {
   }
 
   const handleUpdateRate = (jenjang: string, component: string, value: number) => {
+    const targetKey = rateMode === 'keringanan' ? `keringanan_${jenjang}` : jenjang
     setRates(prev => ({
       ...prev,
-      [jenjang]: {
-        ...prev[jenjang],
+      [targetKey]: {
+        ...prev[targetKey],
         [component]: value
       }
     }))
   }
 
   const getJenjangTotal = (jenjang: string) => {
-    const jRates = rates[jenjang] || {}
+    const targetKey = rateMode === 'keringanan' ? `keringanan_${jenjang}` : jenjang
+    const jRates = rates[targetKey] || {}
     return Object.values(jRates).reduce((sum, val) => sum + (Number(val) || 0), 0)
   }
 
@@ -214,6 +220,26 @@ export default function BillsPage() {
       setLoading(false)
     }
   }
+  
+  const handleGenerateKeringananBills = async () => {
+    if (keringananAmount <= 0) return alert('Masukkan nominal keringanan yang valid');
+    if (!confirm(`Generate tagihan KERINGANAN untuk bulan ${selectedMonth}/${selectedYear} dengan nominal Rp ${keringananAmount}?`)) return;
+    setLoading(true);
+    try {
+      const response = await generateKeringananBills(selectedMonth, selectedYear, keringananAmount);
+      if (response.success) {
+        alert(response.message);
+        fetchStats();
+        fetchRates();
+      } else {
+        alert('Gagal: ' + response.error);
+      }
+    } catch (error: any) {
+      alert('Gagal generate tagihan keringanan: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -359,18 +385,43 @@ export default function BillsPage() {
 
             {/* Rates Form for Active Jenjang */}
             <motion.div
-              key={activeJenjang}
+              key={`${activeJenjang}-${rateMode}`}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className="space-y-4"
             >
-              <div className="flex items-center gap-3 mb-4">
-                <span className="text-2xl">{JENJANG_ICONS[activeJenjang]}</span>
-                <div>
-                  <h4 className="font-bold text-slate-200">Rincian Tarif — {getJenjangLabel(activeJenjang)}</h4>
-                  <p className="text-xs text-slate-500">
-                    {studentCounts[activeJenjang] || 0} santri terdaftar di jenjang ini
-                  </p>
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">{JENJANG_ICONS[activeJenjang]}</span>
+                  <div>
+                    <h4 className="font-bold text-slate-200">
+                      Rincian Tarif — {getJenjangLabel(activeJenjang)} {rateMode === 'keringanan' ? '(Keringanan)' : '(Reguler)'}
+                    </h4>
+                    <p className="text-xs text-slate-500">
+                      {studentCounts[activeJenjang] || 0} santri terdaftar di jenjang ini
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center bg-slate-900 rounded-xl p-1 border border-slate-800">
+                  <button
+                    onClick={() => setRateMode('reguler')}
+                    className={cn(
+                      "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                      rateMode === 'reguler' ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"
+                    )}
+                  >
+                    Reguler
+                  </button>
+                  <button
+                    onClick={() => setRateMode('keringanan')}
+                    className={cn(
+                      "px-4 py-1.5 rounded-lg text-xs font-bold transition-all",
+                      rateMode === 'keringanan' ? "bg-slate-700 text-amber-400" : "text-slate-400 hover:text-amber-400/50"
+                    )}
+                  >
+                    Keringanan
+                  </button>
                 </div>
               </div>
 
@@ -384,7 +435,7 @@ export default function BillsPage() {
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 font-medium">Rp</span>
                       <input 
                         type="number" 
-                        value={rates[activeJenjang]?.[comp.key] || 0} 
+                        value={rates[rateMode === 'keringanan' ? `keringanan_${activeJenjang}` : activeJenjang]?.[comp.key] || 0} 
                         onChange={(e) => handleUpdateRate(activeJenjang, comp.key, Number(e.target.value))} 
                         className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none font-medium" 
                       />
@@ -477,7 +528,7 @@ export default function BillsPage() {
               </p>
             </div>
 
-            <button 
+            <button
               onClick={handleGenerateBills}
               disabled={loading}
               className="w-full btn-primary py-4 text-lg"
